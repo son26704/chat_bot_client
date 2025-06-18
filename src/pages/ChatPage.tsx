@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Button, Card, Input, Typography, message } from "antd";
+import { useState, useEffect } from "react";
+import { Button, Card, Input, Typography, message, List } from "antd";
 import { useAuth } from "../hooks/useAuth";
-import api from "../services/api";
+import { sendChat, getConversationHistory } from "../services/authService";
+import type { Message, Conversation } from "../types/auth";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -9,11 +10,8 @@ const { TextArea } = Input;
 const ChatPage = () => {
   const { user, logout } = useAuth();
   const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState("");
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(false);
-  type ChatResponse = {
-    response: string;
-  };
 
   const handleSend = async () => {
     if (!prompt.trim()) {
@@ -22,13 +20,26 @@ const ChatPage = () => {
     }
     setLoading(true);
     try {
-      const res = await api.post<ChatResponse>("/chat", { prompt });
-      setResponse(res.data.response);
+      const res = await sendChat({
+        prompt,
+        conversationId: conversation?.id,
+      });
       setPrompt("");
+      // Thêm delay nhỏ để đảm bảo database commit
+      setTimeout(() => fetchConversation(res.conversationId), 500);
     } catch (error) {
       message.error("Failed to get response");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchConversation = async (conversationId: string) => {
+    try {
+      const conv = await getConversationHistory(conversationId);
+      setConversation(conv);
+    } catch (error: any) {
+      message.error(`Failed to load conversation: ${error.message}`);
     }
   };
 
@@ -43,6 +54,35 @@ const ChatPage = () => {
     >
       <Title level={2}>Chat with Gemini</Title>
       <p>Welcome, {user?.name}!</p>
+      {conversation && (
+        <List
+          dataSource={conversation.Messages}
+          renderItem={(msg: Message) => (
+            <List.Item
+              style={{
+                justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+              }}
+            >
+              <Card
+                style={{
+                  maxWidth: "70%",
+                  background: msg.role === "user" ? "#e6f7ff" : "#f6ffed",
+                }}
+              >
+                <p>
+                  <strong>{msg.role === "user" ? "You" : "Gemini"}:</strong>{" "}
+                  {msg.content}
+                </p>
+              </Card>
+            </List.Item>
+          )}
+          style={{
+            maxHeight: "400px",
+            overflowY: "auto",
+            marginBottom: "20px",
+          }}
+        />
+      )}
       <TextArea
         rows={4}
         value={prompt}
@@ -53,14 +93,6 @@ const ChatPage = () => {
       <Button type="primary" onClick={handleSend} loading={loading} block>
         Send
       </Button>
-      {response && (
-        <Card style={{ marginTop: "20px" }}>
-          <p>
-            <strong>Response:</strong>
-          </p>
-          <p>{response}</p>
-        </Card>
-      )}
       <Button
         type="primary"
         danger

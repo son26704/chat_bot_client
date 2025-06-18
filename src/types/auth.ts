@@ -24,3 +24,26 @@ export interface User {
   email: string;
   name: string;
 }
+
+export interface ChatRequest {
+  prompt: string;
+  conversationId?: string;
+}
+
+export interface ChatResponse {
+  response: string;
+  conversationId: string;
+}
+
+export interface Message {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  Messages: Message[];
+}
