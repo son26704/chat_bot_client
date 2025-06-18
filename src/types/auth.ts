@@ -44,6 +44,8 @@ export interface Message {
 
 export interface Conversation {
   id: string;
-  title: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
   Messages: Message[];
 }

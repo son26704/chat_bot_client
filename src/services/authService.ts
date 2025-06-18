@@ -25,3 +25,8 @@ export const getConversationHistory = async (conversationId: string): Promise<Co
   const response = await api.get<Conversation>(`/chat/${conversationId}`);
   return response.data;
 };
+
+export const getUserConversations = async (): Promise<Conversation[]> => {
+  const response = await api.get<Conversation[]>('/conversations');
+  return response.data;
+};
