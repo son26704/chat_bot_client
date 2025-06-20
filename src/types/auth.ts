@@ -1,7 +1,7 @@
 export interface RegisterRequest {
+  name: string;
   email: string;
   password: string;
-  name: string;
 }
 
 export interface LoginRequest {
@@ -12,17 +12,13 @@ export interface LoginRequest {
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
-  user: {
-    id: string;
-    email: string;
-    name: string;
-  };
+  user: User;
 }
 
 export interface User {
   id: string;
-  email: string;
   name: string;
+  email: string;
 }
 
 export interface ChatRequest {
@@ -31,8 +27,8 @@ export interface ChatRequest {
 }
 
 export interface ChatResponse {
-  response: string;
   conversationId: string;
+  message: Message;
 }
 
 export interface Message {
@@ -44,8 +40,8 @@ export interface Message {
 
 export interface Conversation {
   id: string;
-  title: string | null;
+  title: string;
+  Messages: Message[];
   createdAt: string;
   updatedAt: string;
-  Messages: Message[];
 }

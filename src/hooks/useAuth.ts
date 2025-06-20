@@ -1,7 +1,7 @@
 import { useState, useEffect }from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { LoginRequest, RegisterRequest, User } from '../types/auth';
-import { login, register, refreshToken } from '../services/authService';
+import { login, register, refreshToken, initSocket, disconnectSocket } from '../services/authService';
 
 interface AuthState {
   user: User | null;
@@ -33,9 +33,14 @@ export const useAuth = () => {
         isAuthenticated: true,
         isLoading: false,
       });
+      initSocket(token);
     } else {
       setAuthState((prev) => ({ ...prev, isLoading: false }));
     }
+
+    return () => {
+      disconnectSocket();
+    };
   }, []);
 
   const loginUser = async (data: LoginRequest) => {
@@ -44,6 +49,7 @@ export const useAuth = () => {
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
+      initSocket(accessToken);
       setAuthState({
         user,
         token: accessToken,
@@ -89,6 +95,7 @@ export const useAuth = () => {
   };
 
   const logout = () => {
+    disconnectSocket();
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');

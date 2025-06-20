@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Button, Card, Input, Typography, message, List, Layout, Menu, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined, SendOutlined, LogoutOutlined } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
-import { sendChat, getConversationHistory, getUserConversations, deleteConversation } from '../services/authService';
-import type { Message, Conversation } from '../types/auth';
+import { sendChatSocket, getConversationHistory, getUserConversations, deleteConversation, getSocket } from '../services/authService';
+import type { Message, Conversation, ChatResponse } from '../types/auth';
 import ReactMarkdown from 'react-markdown';
 
 const { Title } = Typography;
@@ -16,17 +16,53 @@ const ChatPage = () => {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isStartingNewConversation, setIsStartingNewConversation] = useState(false);
 
   useEffect(() => {
     fetchConversations();
-  }, []);
+    const socket = getSocket();
+    
+    if (socket) {
+      socket.on('receive_message', (response: ChatResponse) => {
+        if (conversation?.id === response.conversationId) {
+          setConversation(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              Messages: [...prev.Messages, response.message]
+            };
+          });
+        }
+        setIsTyping(false);
+        fetchConversations();
+      });
+
+      socket.on('typing', (data: { conversationId: string }) => {
+        if (conversation?.id === data.conversationId) {
+          setIsTyping(true);
+        }
+      });
+    }
+
+    return () => {
+      const socket = getSocket();
+      if (socket) {
+        socket.off('receive_message');
+        socket.off('typing');
+      }
+    };
+  }, [conversation?.id]);
 
   const fetchConversations = async () => {
     try {
       const convs = await getUserConversations();
       setConversations(convs);
-      if (convs.length > 0 && !conversation) {
+      if (convs.length > 0 && !conversation && !isStartingNewConversation) {
         fetchConversation(convs[0].id);
+      }
+      if (isStartingNewConversation) {
+        setIsStartingNewConversation(false);
       }
     } catch (error) {
       message.error('Failed to load conversations');
@@ -47,19 +83,44 @@ const ChatPage = () => {
       message.error('Please enter a message');
       return;
     }
-    setLoading(true);
+    setPrompt('');
     try {
-      const res = await sendChat({
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        content: prompt,
+        role: 'user',
+        createdAt: new Date().toISOString()
+      };
+
+      setConversation(prev => {
+        if (!prev) {
+          return {
+            id: 'temp',
+            title: '',
+            Messages: [userMessage],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return {
+          ...prev,
+          Messages: [...prev.Messages, userMessage]
+        };
+      });
+
+      setIsTyping(true);
+
+      const res = await sendChatSocket({
         prompt,
         conversationId: conversation?.id,
       });
-      setPrompt('');
-      await fetchConversation(res.conversationId);
-      await fetchConversations();
+
+      if (!conversation) {
+        await fetchConversations();
+      }
     } catch (error) {
-      message.error('Failed to get response');
-    } finally {
-      setLoading(false);
+      message.error('Failed to send message');
+      setIsTyping(false);
     }
   };
 
@@ -70,6 +131,7 @@ const ChatPage = () => {
   const handleNewConversation = () => {
     setConversation(null);
     setPrompt('');
+    setIsStartingNewConversation(true);
   };
 
   const handleDeleteConversation = async (convId: string) => {
@@ -175,6 +237,13 @@ const ChatPage = () => {
                 )}
               />
             )}
+            {isTyping && (
+              <div className="message-container">
+                <div className="message-bubble assistant typing">
+                  AI is typing...
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="chat-input-container">
@@ -189,7 +258,6 @@ const ChatPage = () => {
             <Button 
               type="primary" 
               onClick={handleSend} 
-              loading={loading} 
               icon={<SendOutlined />}
               block
             >

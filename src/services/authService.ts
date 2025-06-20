@@ -1,4 +1,8 @@
 import api from "./api";
+import io from 'socket.io-client';
+
+type Socket = ReturnType<typeof io>;
+
 import type {
   RegisterRequest,
   LoginRequest,
@@ -7,6 +11,37 @@ import type {
   ChatResponse,
   Conversation,
 } from "../types/auth";
+
+let socket: (Socket | null) = null;
+
+export const initSocket = (token: string) => {
+  if (socket) {
+    socket.disconnect();
+  }
+  socket = io('http://localhost:3000', {
+    autoConnect: true,
+    auth: { token: `Bearer ${token}` },
+  });
+
+  socket.on('connect', () => {
+    console.log('Socket connected');
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error);
+  });
+
+  return socket;
+};
+
+export const getSocket = () => socket;
+
+export const disconnectSocket = () => {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+};
 
 export const register = async (
   data: RegisterRequest
@@ -50,4 +85,21 @@ export const deleteConversation = async (
   conversationId: string
 ): Promise<void> => {
   await api.delete(`/conversations/${conversationId}`);
+};
+
+export const sendChatSocket = (data: ChatRequest): Promise<ChatResponse> => {
+  return new Promise((resolve, reject) => {
+    if (!socket) {
+      reject(new Error('Socket not initialized'));
+      return;
+    }
+
+    socket.emit('send_message', data, (response: { success: boolean; data?: ChatResponse; error?: string }) => {
+      if (response.success && response.data) {
+        resolve(response.data);
+      } else {
+        reject(new Error(response.error || 'Failed to send message'));
+      }
+    });
+  });
 };
