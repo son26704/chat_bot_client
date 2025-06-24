@@ -103,3 +103,10 @@ export const sendChatSocket = (data: ChatRequest): Promise<ChatResponse> => {
     });
   });
 };
+
+export const renameConversation = async (
+  conversationId: string,
+  title: string
+): Promise<void> => {
+  await api.patch(`/conversations/${conversationId}`, { title });
+};

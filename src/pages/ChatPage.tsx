@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button, Card, Input, Typography, message, List, Layout, Menu, Popconfirm } from 'antd';
-import { PlusOutlined, DeleteOutlined, SendOutlined, LogoutOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, SendOutlined, LogoutOutlined, EditOutlined } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
-import { sendChatSocket, getConversationHistory, getUserConversations, deleteConversation, getSocket } from '../services/authService';
+import { sendChatSocket, getConversationHistory, getUserConversations, deleteConversation, getSocket, renameConversation } from '../services/authService';
 import type { Message, Conversation, ChatResponse } from '../types/auth';
 import ReactMarkdown from 'react-markdown';
 
@@ -18,6 +18,9 @@ const ChatPage = () => {
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isStartingNewConversation, setIsStartingNewConversation] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -25,21 +28,32 @@ const ChatPage = () => {
     
     if (socket) {
       socket.on('receive_message', (response: ChatResponse) => {
-        if (conversation?.id === response.conversationId) {
+        if (
+          (conversation && conversation.id === response.conversationId) ||
+          (conversation?.id === 'temp' && response.conversationId)
+        ) {
           setConversation(prev => {
             if (!prev) return null;
+            
+            const newMessages = prev.id === 'temp' 
+              ? [prev.Messages[0], response.message] 
+              : [...prev.Messages, response.message];
+
             return {
               ...prev,
-              Messages: [...prev.Messages, response.message]
+              id: response.conversationId,
+              Messages: newMessages,
             };
           });
+          if (conversation?.id === 'temp') {
+            fetchConversations();
+          }
         }
         setIsTyping(false);
-        fetchConversations();
       });
 
       socket.on('typing', (data: { conversationId: string }) => {
-        if (conversation?.id === data.conversationId) {
+        if (conversation?.id === data.conversationId || (conversation?.id === 'temp')) {
           setIsTyping(true);
         }
       });
@@ -53,6 +67,12 @@ const ChatPage = () => {
       }
     };
   }, [conversation?.id]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [conversation?.Messages.length, isTyping]);
 
   const fetchConversations = async () => {
     try {
@@ -92,6 +112,8 @@ const ChatPage = () => {
         createdAt: new Date().toISOString()
       };
 
+      const currentConversation = conversation;
+
       setConversation(prev => {
         if (!prev) {
           return {
@@ -110,14 +132,11 @@ const ChatPage = () => {
 
       setIsTyping(true);
 
-      const res = await sendChatSocket({
+      await sendChatSocket({
         prompt,
-        conversationId: conversation?.id,
+        conversationId: currentConversation?.id === 'temp' ? undefined : currentConversation?.id,
       });
 
-      if (!conversation) {
-        await fetchConversations();
-      }
     } catch (error) {
       message.error('Failed to send message');
       setIsTyping(false);
@@ -154,6 +173,25 @@ const ChatPage = () => {
     }
   };
 
+  const handleRenameConversation = async (convId: string) => {
+    if (!renameValue.trim()) {
+      message.error('Title cannot be empty');
+      return;
+    }
+    try {
+      await renameConversation(convId, renameValue.trim());
+      setConversations(conversations => conversations.map(conv => conv.id === convId ? { ...conv, title: renameValue.trim() } : conv));
+      if (conversation?.id === convId) {
+        setConversation({ ...conversation, title: renameValue.trim() });
+      }
+      setRenamingId(null);
+      setRenameValue('');
+      message.success('Conversation renamed');
+    } catch (error) {
+      message.error('Failed to rename conversation');
+    }
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider width={280} theme="light" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -179,22 +217,58 @@ const ChatPage = () => {
               key: conv.id,
               label: (
                 <div className="conversation-item">
-                  <span>{conv.title || `Chat ${conv.createdAt.slice(0, 10)}`}</span>
-                  <Popconfirm
-                    title="Delete this conversation?"
-                    onConfirm={() => handleDeleteConversation(conv.id)}
-                    okText="Yes"
-                    cancelText="No"
-                  >
-                    <Button
-                      className="delete-btn"
-                      type="text"
-                      icon={<DeleteOutlined />}
-                      danger
-                      size="small"
-                      onClick={e => e.stopPropagation()}
-                    />
-                  </Popconfirm>
+                  {renamingId === conv.id ? (
+                    <>
+                      <Input
+                        size="small"
+                        value={renameValue}
+                        autoFocus
+                        onChange={e => setRenameValue(e.target.value)}
+                        onBlur={() => setRenamingId(null)}
+                        onPressEnter={() => handleRenameConversation(conv.id)}
+                        style={{ width: '70%' }}
+                        maxLength={50}
+                      />
+                      <Button
+                        type="text"
+                        icon={<SendOutlined />}
+                        size="small"
+                        onClick={() => handleRenameConversation(conv.id)}
+                        style={{ marginLeft: 4 }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <span>{conv.title || `Chat ${conv.createdAt.slice(0, 10)}`}</span>
+                      <Button
+                        className="edit-btn"
+                        type="text"
+                        icon={<EditOutlined />}
+                        size="small"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setRenamingId(conv.id);
+                          setRenameValue(conv.title || '');
+                        }}
+                        style={{ marginLeft: 4 }}
+                      />
+                      <Popconfirm
+                        title="Delete this conversation?"
+                        onConfirm={() => handleDeleteConversation(conv.id)}
+                        okText="Yes"
+                        cancelText="No"
+                      >
+                        <Button
+                          className="delete-btn"
+                          type="text"
+                          icon={<DeleteOutlined />}
+                          danger
+                          size="small"
+                          onClick={e => e.stopPropagation()}
+                        />
+                      </Popconfirm>
+                    </>
+                  )}
                 </div>
               ),
             }))}
@@ -240,10 +314,13 @@ const ChatPage = () => {
             {isTyping && (
               <div className="message-container">
                 <div className="message-bubble assistant typing">
-                  AI is typing...
+                  <div className="typing-dots">
+                    AI is typing<span>.</span><span>.</span><span>.</span>
+                  </div>
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="chat-input-container">
