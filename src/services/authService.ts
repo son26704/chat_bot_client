@@ -18,7 +18,7 @@ export const initSocket = (token: string) => {
   if (socket) {
     socket.disconnect();
   }
-  socket = io('http://localhost:3000', {
+  socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000', {
     autoConnect: true,
     auth: { token: `Bearer ${token}` },
   });
