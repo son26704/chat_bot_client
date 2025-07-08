@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button, Card, Input, Typography, message, List, Layout, Menu, Popconfirm } from 'antd';
+import { Button, Input, Typography, message, List, Layout, Menu, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined, SendOutlined, LogoutOutlined, EditOutlined } from '@ant-design/icons';
 import { useAuth } from '../hooks/useAuth';
 import { sendChatSocket, getConversationHistory, getUserConversations, deleteConversation, getSocket, renameConversation } from '../services/authService';
@@ -15,7 +15,7 @@ const ChatPage = () => {
   const [prompt, setPrompt] = useState('');
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isStartingNewConversation, setIsStartingNewConversation] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
