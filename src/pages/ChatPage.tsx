@@ -1,10 +1,34 @@
-import { useState, useEffect, useRef } from 'react';
-import { Button, Card, Input, Typography, message, List, Layout, Menu, Popconfirm } from 'antd';
-import { PlusOutlined, DeleteOutlined, SendOutlined, LogoutOutlined, EditOutlined } from '@ant-design/icons';
-import { useAuth } from '../hooks/useAuth';
-import { sendChatSocket, getConversationHistory, getUserConversations, deleteConversation, getSocket, renameConversation } from '../services/authService';
-import type { Message, Conversation, ChatResponse } from '../types/auth';
-import ReactMarkdown from 'react-markdown';
+import { useState, useEffect, useRef } from "react";
+import {
+  Button,
+  Input,
+  Typography,
+  message,
+  List,
+  Layout,
+  Menu,
+  Popconfirm,
+} from "antd";
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  SendOutlined,
+  LogoutOutlined,
+  EditOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+} from "@ant-design/icons";
+import { useAuth } from "../hooks/useAuth";
+import {
+  sendChatSocket,
+  getConversationHistory,
+  getUserConversations,
+  deleteConversation,
+  getSocket,
+  renameConversation,
+} from "../services/authService";
+import type { Message, Conversation, ChatResponse } from "../types/auth";
+import ReactMarkdown from "react-markdown";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -12,32 +36,34 @@ const { Sider, Content } = Layout;
 
 const ChatPage = () => {
   const { user, logout } = useAuth();
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [isStartingNewConversation, setIsStartingNewConversation] = useState(false);
+  const [isStartingNewConversation, setIsStartingNewConversation] =
+    useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     fetchConversations();
     const socket = getSocket();
-    
+
     if (socket) {
-      socket.on('receive_message', (response: ChatResponse) => {
+      socket.on("receive_message", (response: ChatResponse) => {
         if (
           (conversation && conversation.id === response.conversationId) ||
-          (conversation?.id === 'temp' && response.conversationId)
+          (conversation?.id === "temp" && response.conversationId)
         ) {
-          setConversation(prev => {
+          setConversation((prev) => {
             if (!prev) return null;
-            
-            const newMessages = prev.id === 'temp' 
-              ? [prev.Messages[0], response.message] 
-              : [...prev.Messages, response.message];
+
+            const newMessages =
+              prev.id === "temp"
+                ? [prev.Messages[0], response.message]
+                : [...prev.Messages, response.message];
 
             return {
               ...prev,
@@ -45,15 +71,18 @@ const ChatPage = () => {
               Messages: newMessages,
             };
           });
-          if (conversation?.id === 'temp') {
+          if (conversation?.id === "temp") {
             fetchConversations();
           }
         }
         setIsTyping(false);
       });
 
-      socket.on('typing', (data: { conversationId: string }) => {
-        if (conversation?.id === data.conversationId || (conversation?.id === 'temp')) {
+      socket.on("typing", (data: { conversationId: string }) => {
+        if (
+          conversation?.id === data.conversationId ||
+          conversation?.id === "temp"
+        ) {
           setIsTyping(true);
         }
       });
@@ -62,15 +91,15 @@ const ChatPage = () => {
     return () => {
       const socket = getSocket();
       if (socket) {
-        socket.off('receive_message');
-        socket.off('typing');
+        socket.off("receive_message");
+        socket.off("typing");
       }
     };
   }, [conversation?.id]);
 
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [conversation?.Messages.length, isTyping]);
 
@@ -85,7 +114,7 @@ const ChatPage = () => {
         setIsStartingNewConversation(false);
       }
     } catch (error) {
-      message.error('Failed to load conversations');
+      message.error("Failed to load conversations");
     }
   };
 
@@ -94,39 +123,39 @@ const ChatPage = () => {
       const conv = await getConversationHistory(conversationId);
       setConversation(conv);
     } catch (error) {
-      message.error('Failed to load conversation');
+      message.error("Failed to load conversation");
     }
   };
 
   const handleSend = async () => {
     if (!prompt.trim()) {
-      message.error('Please enter a message');
+      message.error("Please enter a message");
       return;
     }
-    setPrompt('');
+    setPrompt("");
     try {
       const userMessage: Message = {
         id: Date.now().toString(),
         content: prompt,
-        role: 'user',
-        createdAt: new Date().toISOString()
+        role: "user",
+        createdAt: new Date().toISOString(),
       };
 
       const currentConversation = conversation;
 
-      setConversation(prev => {
+      setConversation((prev) => {
         if (!prev) {
           return {
-            id: 'temp',
-            title: '',
+            id: "temp",
+            title: "",
             Messages: [userMessage],
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           };
         }
         return {
           ...prev,
-          Messages: [...prev.Messages, userMessage]
+          Messages: [...prev.Messages, userMessage],
         };
       });
 
@@ -134,22 +163,25 @@ const ChatPage = () => {
 
       await sendChatSocket({
         prompt,
-        conversationId: currentConversation?.id === 'temp' ? undefined : currentConversation?.id,
+        conversationId:
+          currentConversation?.id === "temp"
+            ? undefined
+            : currentConversation?.id,
       });
-
     } catch (error) {
-      message.error('Failed to send message');
+      message.error("Failed to send message");
       setIsTyping(false);
     }
   };
 
   const handleSelectConversation = (convId: string) => {
     fetchConversation(convId);
+    setSidebarOpen(false);
   };
 
   const handleNewConversation = () => {
     setConversation(null);
-    setPrompt('');
+    setPrompt("");
     setIsStartingNewConversation(true);
   };
 
@@ -160,14 +192,14 @@ const ChatPage = () => {
       if (conversation?.id === convId) {
         setConversation(null);
       }
-      message.success('Conversation deleted');
+      message.success("Conversation deleted");
     } catch (error) {
-      message.error('Failed to delete conversation');
+      message.error("Failed to delete conversation");
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -175,31 +207,52 @@ const ChatPage = () => {
 
   const handleRenameConversation = async (convId: string) => {
     if (!renameValue.trim()) {
-      message.error('Title cannot be empty');
+      message.error("Title cannot be empty");
       return;
     }
     try {
       await renameConversation(convId, renameValue.trim());
-      setConversations(conversations => conversations.map(conv => conv.id === convId ? { ...conv, title: renameValue.trim() } : conv));
+      setConversations((conversations) =>
+        conversations.map((conv) =>
+          conv.id === convId ? { ...conv, title: renameValue.trim() } : conv
+        )
+      );
       if (conversation?.id === convId) {
         setConversation({ ...conversation, title: renameValue.trim() });
       }
       setRenamingId(null);
-      setRenameValue('');
-      message.success('Conversation renamed');
+      setRenameValue("");
+      message.success("Conversation renamed");
     } catch (error) {
-      message.error('Failed to rename conversation');
+      message.error("Failed to rename conversation");
     }
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={280} theme="light" style={{ display: 'flex', flexDirection: 'column' }}>
+    <Layout style={{ minHeight: "100vh" }}>
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <Sider
+        width={280}
+        theme="light"
+        className={`${sidebarOpen ? "open" : ""} ${
+          !sidebarOpen ? "hidden-desktop" : ""
+        }`}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <div>
-          <Title level={4} style={{ padding: '16px', margin: 0 }}>
+          <Title level={4} style={{ padding: "16px", margin: 0 }}>
             Conversations
           </Title>
-          <div style={{ padding: '0 16px 16px' }}>
+          <div style={{ padding: "0 16px 16px" }}>
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -223,10 +276,10 @@ const ChatPage = () => {
                         size="small"
                         value={renameValue}
                         autoFocus
-                        onChange={e => setRenameValue(e.target.value)}
+                        onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={() => setRenamingId(null)}
                         onPressEnter={() => handleRenameConversation(conv.id)}
-                        style={{ width: '70%' }}
+                        style={{ width: "70%" }}
                         maxLength={50}
                       />
                       <Button
@@ -239,16 +292,18 @@ const ChatPage = () => {
                     </>
                   ) : (
                     <>
-                      <span>{conv.title || `Chat ${conv.createdAt.slice(0, 10)}`}</span>
+                      <span>
+                        {conv.title || `Chat ${conv.createdAt.slice(0, 10)}`}
+                      </span>
                       <Button
                         className="edit-btn"
                         type="text"
                         icon={<EditOutlined />}
                         size="small"
-                        onClick={e => {
+                        onClick={(e) => {
                           e.stopPropagation();
                           setRenamingId(conv.id);
-                          setRenameValue(conv.title || '');
+                          setRenameValue(conv.title || "");
                         }}
                         style={{ marginLeft: 4 }}
                       />
@@ -264,7 +319,7 @@ const ChatPage = () => {
                           icon={<DeleteOutlined />}
                           danger
                           size="small"
-                          onClick={e => e.stopPropagation()}
+                          onClick={(e) => e.stopPropagation()}
                         />
                       </Popconfirm>
                     </>
@@ -274,10 +329,16 @@ const ChatPage = () => {
             }))}
           />
         </div>
-        <div style={{ marginTop: 'auto', padding: '16px', borderTop: '1px solid #f0f0f0' }}>
-          <Button 
-            type="default" 
-            onClick={logout} 
+        <div
+          style={{
+            marginTop: "auto",
+            padding: "16px",
+            borderTop: "1px solid #f0f0f0",
+          }}
+        >
+          <Button
+            type="default"
+            onClick={logout}
             icon={<LogoutOutlined />}
             block
           >
@@ -285,21 +346,61 @@ const ChatPage = () => {
           </Button>
         </div>
       </Sider>
-      <Content style={{ padding: '0', background: '#fafafa' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '20px', background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
-            <Title level={3} style={{ margin: 0 }}>Chat with Gemini</Title>
-            <p style={{ margin: '8px 0 0' }}>Welcome, {user?.name}!</p>
+
+      {/* Toggle Button */}
+      <Button
+        className="sidebar-toggle-btn"
+        style={{
+          position: "fixed",
+          top: 16,
+          left: sidebarOpen ? 290 : 16,
+          zIndex: 210,
+        }}
+        icon={sidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      />
+
+      <Content
+        style={{ padding: 0, background: "#fafafa", position: "relative" }}
+      >
+        <div
+          style={{
+            maxWidth: 900,
+            margin: "0 auto",
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              padding: 20,
+              background: "#fff",
+              borderBottom: "1px solid #f0f0f0",
+            }}
+          >
+            <Title level={3} style={{ margin: 0 }}>
+              Chat with Gemini
+            </Title>
+            <p style={{ margin: "8px 0 0" }}>Welcome, {user?.name}!</p>
           </div>
-          
+
           <div className="chat-messages">
             {conversation && (
               <List
                 dataSource={conversation.Messages}
                 renderItem={(msg: Message) => (
-                  <div className={`message-container ${msg.role === 'user' ? 'user' : ''}`}>
-                    <div className={`message-bubble ${msg.role === 'user' ? 'user' : 'assistant'}`}>
-                      {msg.role === 'user' ? (
+                  <div
+                    className={`message-container ${
+                      msg.role === "user" ? "user" : ""
+                    }`}
+                  >
+                    <div
+                      className={`message-bubble ${
+                        msg.role === "user" ? "user" : "assistant"
+                      }`}
+                    >
+                      {msg.role === "user" ? (
                         <p style={{ margin: 0 }}>{msg.content}</p>
                       ) : (
                         <div className="markdown-content">
@@ -315,7 +416,9 @@ const ChatPage = () => {
               <div className="message-container">
                 <div className="message-bubble assistant typing">
                   <div className="typing-dots">
-                    AI is typing<span>.</span><span>.</span><span>.</span>
+                    AI is typing<span>.</span>
+                    <span>.</span>
+                    <span>.</span>
                   </div>
                 </div>
               </div>
@@ -330,11 +433,11 @@ const ChatPage = () => {
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyPress}
               placeholder="Type your message... (Press Enter to send, Shift + Enter for new line)"
-              style={{ marginBottom: '12px' }}
+              style={{ marginBottom: "12px" }}
             />
-            <Button 
-              type="primary" 
-              onClick={handleSend} 
+            <Button
+              type="primary"
+              onClick={handleSend}
               icon={<SendOutlined />}
               block
             >
