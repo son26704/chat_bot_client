@@ -45,3 +45,7 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface FollowUpQuestionsResponse {
+  suggestions: string;
+}

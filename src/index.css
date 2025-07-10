@@ -293,3 +293,54 @@ body {
   border: none;
   box-shadow: none;
 }
+
+.suggestions-box {
+  position: absolute;
+  bottom: 160px; 
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 800px;
+  background: #fffbe6;
+  border: 1px solid #faad14;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 12px 16px;
+  z-index: 100;
+}
+
+.suggestions-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  color: #d48806;
+  margin-bottom: 8px;
+}
+
+/* Input + action buttons layout */
+.chat-input-container.input-with-icons {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+
+.chat-input-container.input-with-icons .ant-input {
+  flex: 1;
+  padding-right: 100px; 
+}
+
+.chat-action-buttons {
+  position: absolute;
+  right: 24px;
+  bottom: 20px;
+  display: flex;
+  gap: 8px;
+}
+
+.chat-action-buttons .ant-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

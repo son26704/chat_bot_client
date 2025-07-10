@@ -10,6 +10,7 @@ import type {
   ChatRequest,
   ChatResponse,
   Conversation,
+  FollowUpQuestionsResponse,
 } from "../types/auth";
 
 let socket: (Socket | null) = null;
@@ -117,5 +118,10 @@ export const deleteMessage = async (messageId: string): Promise<void> => {
 
 export const editMessage = async (messageId: string, newContent: string): Promise<ChatResponse> => {
   const response = await api.patch<ChatResponse>(`/messages/${messageId}`, { newContent });
+  return response.data;
+};
+
+export const getFollowUpQuestions = async (conversationId: string): Promise<FollowUpQuestionsResponse> => {
+  const response = await api.get<FollowUpQuestionsResponse>(`/chat/${conversationId}/follow-up`);
   return response.data;
 };

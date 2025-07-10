@@ -8,6 +8,8 @@ import {
   Layout,
   Menu,
   Popconfirm,
+  Modal,
+  Spin,
 } from "antd";
 import {
   PlusOutlined,
@@ -18,6 +20,8 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   CopyOutlined,
+  BulbOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -29,6 +33,7 @@ import {
   renameConversation,
   deleteMessage,
   editMessage,
+  getFollowUpQuestions,
 } from "../services/authService";
 import type { Message, Conversation, ChatResponse } from "../types/auth";
 import ReactMarkdown from "react-markdown";
@@ -54,6 +59,9 @@ const ChatPage = () => {
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
     null
   );
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   useEffect(() => {
     fetchConversations();
@@ -273,6 +281,32 @@ const ChatPage = () => {
       message.success("Message edited and resent");
     } catch (err) {
       message.error("Failed to edit message");
+    }
+  };
+
+  const handleGetSuggestions = async () => {
+    if (!conversation?.id) {
+      message.error("No conversation selected");
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    try {
+      const data = await getFollowUpQuestions(conversation.id);
+      // Xử lý nếu data.suggestions là JSON string bọc markdown
+      const clean = data.suggestions.replace(/```json|```/g, "").trim();
+
+      const parsed = JSON.parse(clean);
+      if (Array.isArray(parsed.suggestions)) {
+        setSuggestions(parsed.suggestions);
+        setShowSuggestions(true);
+      } else {
+        throw new Error("Invalid suggestions");
+      }
+    } catch (err) {
+      message.error("Failed to load suggestions");
+    } finally {
+      setLoadingSuggestions(false);
     }
   };
 
@@ -577,25 +611,80 @@ const ChatPage = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="chat-input-container">
+          <div className="chat-input-container input-with-icons">
             <TextArea
-              rows={3}
+              rows={4} // tăng chiều cao
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={handleKeyPress}
-              placeholder="Type your message... (Press Enter to send, Shift + Enter for new line)"
-              style={{ marginBottom: "12px" }}
+              placeholder="Nhập câu hỏi... (Enter để gửi, Shift + Enter để xuống dòng)"
             />
-            <Button
-              type="primary"
-              onClick={handleSend}
-              icon={<SendOutlined />}
-              block
-            >
-              Send
-            </Button>
+            <div className="chat-action-buttons">
+              <Button
+                icon={<SendOutlined />}
+                type="primary"
+                shape="circle"
+                onClick={handleSend}
+              />
+              <Button
+                icon={<BulbOutlined />}
+                shape="circle"
+                style={{
+                  backgroundColor: "#fff7e6",
+                  border: "1px solid #faad14",
+                  color: "#fa8c16",
+                }}
+                onClick={handleGetSuggestions}
+              />
+            </div>
           </div>
         </div>
+        {showSuggestions && (
+          <div className="suggestions-box">
+            <div className="suggestions-header">
+              <span>💡 Gợi ý câu hỏi tiếp theo</span>
+              <Button
+                type="text"
+                size="small"
+                onClick={() => setShowSuggestions(false)}
+                style={{ float: "right" }}
+              >
+                ✕
+              </Button>
+            </div>
+            {loadingSuggestions ? (
+              <Spin />
+            ) : (
+              <List
+                size="small"
+                dataSource={suggestions}
+                renderItem={(item) => (
+                  <List.Item
+                    style={{
+                      padding: "4px 0",
+                      borderBottom: "1px solid #f0f0f0",
+                    }}
+                    actions={[
+                      <Button
+                        type="link"
+                        icon={<CopyOutlined />}
+                        size="small"
+                        onClick={() => {
+                          setPrompt(item);
+                          message.success("Đã chèn vào ô nhập");
+                        }}
+                      >
+                        Copy
+                      </Button>,
+                    ]}
+                  >
+                    {item}
+                  </List.Item>
+                )}
+              />
+            )}
+          </div>
+        )}
       </Content>
     </Layout>
   );
