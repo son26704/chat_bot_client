@@ -110,3 +110,12 @@ export const renameConversation = async (
 ): Promise<void> => {
   await api.patch(`/conversations/${conversationId}`, { title });
 };
+
+export const deleteMessage = async (messageId: string): Promise<void> => {
+  await api.delete(`/messages/${messageId}`);
+};
+
+export const editMessage = async (messageId: string, newContent: string): Promise<ChatResponse> => {
+  const response = await api.patch<ChatResponse>(`/messages/${messageId}`, { newContent });
+  return response.data;
+};

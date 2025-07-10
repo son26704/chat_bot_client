@@ -17,6 +17,7 @@ import {
   EditOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  CopyOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -26,6 +27,8 @@ import {
   deleteConversation,
   getSocket,
   renameConversation,
+  deleteMessage,
+  editMessage,
 } from "../services/authService";
 import type { Message, Conversation, ChatResponse } from "../types/auth";
 import ReactMarkdown from "react-markdown";
@@ -46,6 +49,11 @@ const ChatPage = () => {
   const [renameValue, setRenameValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     fetchConversations();
@@ -71,9 +79,7 @@ const ChatPage = () => {
               Messages: newMessages,
             };
           });
-          if (conversation?.id === "temp") {
-            fetchConversations();
-          }
+          fetchConversations();
         }
         setIsTyping(false);
       });
@@ -168,6 +174,7 @@ const ChatPage = () => {
             ? undefined
             : currentConversation?.id,
       });
+      await fetchConversations();
     } catch (error) {
       message.error("Failed to send message");
       setIsTyping(false);
@@ -176,7 +183,9 @@ const ChatPage = () => {
 
   const handleSelectConversation = (convId: string) => {
     fetchConversation(convId);
-    setSidebarOpen(false);
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
   };
 
   const handleNewConversation = () => {
@@ -222,9 +231,48 @@ const ChatPage = () => {
       }
       setRenamingId(null);
       setRenameValue("");
+
+      if (window.innerWidth <= 768) {
+        setSidebarOpen(false);
+      }
+
       message.success("Conversation renamed");
     } catch (error) {
       message.error("Failed to rename conversation");
+    }
+  };
+
+  const handleCopy = (content: string) => {
+    navigator.clipboard.writeText(content);
+    message.success("Copied!");
+  };
+
+  const handleDeleteMessage = async (msg: Message) => {
+    try {
+      await deleteMessage(msg.id);
+      if (conversation) await fetchConversation(conversation.id);
+      await fetchConversations();
+      message.success("Message deleted");
+    } catch (err) {
+      message.error("Failed to delete message");
+    }
+  };
+
+  const handleEditMessage = (msg: Message) => {
+    setEditingMessageId(msg.id);
+    setEditValue(msg.content);
+  };
+
+  const handleEditConfirm = async (msg: Message) => {
+    try {
+      await editMessage(msg.id, editValue);
+      setEditingMessageId(null);
+      setEditValue("");
+      if (conversation) await fetchConversation(conversation.id);
+      await fetchConversations(); // Thêm dòng này để cập nhật lại danh sách sidebar
+      message.success("Message edited and resent");
+    } catch (err) {
+      message.error("Failed to edit message");
     }
   };
 
@@ -286,7 +334,10 @@ const ChatPage = () => {
                         type="text"
                         icon={<SendOutlined />}
                         size="small"
-                        onClick={() => handleRenameConversation(conv.id)}
+                        onMouseDown={(e) => {
+                          e.stopPropagation(); // tránh click vào menu item
+                          handleRenameConversation(conv.id);
+                        }}
                         style={{ marginLeft: 4 }}
                       />
                     </>
@@ -389,7 +440,7 @@ const ChatPage = () => {
             {conversation && (
               <List
                 dataSource={conversation.Messages}
-                renderItem={(msg: Message) => (
+                renderItem={(msg: Message, idx) => (
                   <div
                     className={`message-container ${
                       msg.role === "user" ? "user" : ""
@@ -399,13 +450,113 @@ const ChatPage = () => {
                       className={`message-bubble ${
                         msg.role === "user" ? "user" : "assistant"
                       }`}
+                      style={{ position: "relative" }}
                     >
-                      {msg.role === "user" ? (
-                        <p style={{ margin: 0 }}>{msg.content}</p>
-                      ) : (
-                        <div className="markdown-content">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      {editingMessageId === msg.id ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            flexDirection: "column",
+                            gap: 4,
+                          }}
+                        >
+                          <Input.TextArea
+                            value={editValue}
+                            autoSize
+                            autoFocus
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onPressEnter={(e) => {
+                              if (!e.shiftKey) {
+                                e.preventDefault();
+                                setDeletingMessageId(msg.id);
+                              }
+                            }}
+                          />
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              alignSelf: "flex-end",
+                            }}
+                          >
+                            <Popconfirm
+                              title="Edit this message? (All below will be deleted and resent)"
+                              onConfirm={() => handleEditConfirm(msg)}
+                              onCancel={() => setEditingMessageId(null)}
+                              okText="Yes"
+                              cancelText="No"
+                              open={deletingMessageId === msg.id}
+                              onOpenChange={(open) => {
+                                if (!open) setDeletingMessageId(null);
+                              }}
+                            >
+                              <Button
+                                type="primary"
+                                icon={<SendOutlined />}
+                                size="middle"
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                }}
+                                onClick={() => setDeletingMessageId(msg.id)}
+                              >
+                                Send
+                              </Button>
+                            </Popconfirm>
+                            <Button
+                              type="default"
+                              size="middle"
+                              onClick={() => {
+                                setEditingMessageId(null);
+                                setEditValue("");
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
+                      ) : msg.role === "user" ? (
+                        <>
+                          <p style={{ margin: 0 }}>{msg.content}</p>
+                          <div className="message-actions">
+                            <Button
+                              icon={<CopyOutlined />}
+                              size="small"
+                              onClick={() => handleCopy(msg.content)}
+                            />
+                            <Button
+                              icon={<EditOutlined />}
+                              size="small"
+                              onClick={() => handleEditMessage(msg)}
+                            />
+                            <Popconfirm
+                              title="Delete this message and all below?"
+                              onConfirm={() => handleDeleteMessage(msg)}
+                              okText="Yes"
+                              cancelText="No"
+                            >
+                              <Button
+                                icon={<DeleteOutlined />}
+                                danger
+                                size="small"
+                              />
+                            </Popconfirm>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="markdown-content">
+                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          </div>
+                          <div className="message-actions">
+                            <Button
+                              icon={<CopyOutlined />}
+                              size="small"
+                              onClick={() => handleCopy(msg.content)}
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>

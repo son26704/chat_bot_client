@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, Typography, message } from 'antd';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -6,9 +6,13 @@ import { useNavigate } from 'react-router-dom';
 const { Title } = Typography;
 
 const LoginPage = () => {
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (isAuthenticated) navigate('/chat');
+  }, [isAuthenticated, navigate]);
 
   const onFinish = async (values: { email: string; password: string }) => {
     try {
