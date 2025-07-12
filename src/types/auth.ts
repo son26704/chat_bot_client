@@ -1,3 +1,4 @@
+// client/src/types/auth.ts
 export interface RegisterRequest {
   name: string;
   email: string;

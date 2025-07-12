@@ -1,3 +1,4 @@
+// client/src/services/authService.ts
 import api from "./api";
 import io from 'socket.io-client';
 
@@ -124,4 +125,14 @@ export const editMessage = async (messageId: string, newContent: string): Promis
 export const getFollowUpQuestions = async (conversationId: string): Promise<FollowUpQuestionsResponse> => {
   const response = await api.get<FollowUpQuestionsResponse>(`/chat/${conversationId}/follow-up`);
   return response.data;
+};
+
+export const getUserProfile = async (): Promise<Record<string, string[]>> => {
+  const response = await api.get<Record<string, string[]>>('/profile');
+  return response.data;
+};
+
+
+export const updateUserProfile = async (data: Record<string, string[]>) => {
+  return await api.put('/profile', data);
 };

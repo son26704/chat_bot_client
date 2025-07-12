@@ -35,6 +35,7 @@ import {
   editMessage,
   getFollowUpQuestions,
 } from "../services/authService";
+import UserProfileModal from "./UserProfileModal";
 import type { Message, Conversation, ChatResponse } from "../types/auth";
 import ReactMarkdown from "react-markdown";
 
@@ -62,6 +63,7 @@ const ChatPage = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     fetchConversations();
@@ -429,6 +431,15 @@ const ChatPage = () => {
           >
             Logout
           </Button>
+          <Button
+            type="default"
+            onClick={() => setShowProfileModal(true)}
+            icon={<EditOutlined />}
+            block
+            style={{ marginTop: 8 }}
+          >
+            Hồ sơ người dùng
+          </Button>
         </div>
       </Sider>
 
@@ -685,6 +696,10 @@ const ChatPage = () => {
             )}
           </div>
         )}
+        <UserProfileModal
+          visible={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+        />
       </Content>
     </Layout>
   );
