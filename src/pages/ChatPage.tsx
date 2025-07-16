@@ -20,6 +20,7 @@ import {
   MenuUnfoldOutlined,
   CopyOutlined,
   BulbOutlined,
+  FileSearchOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -73,6 +74,9 @@ const ChatPage = () => {
   > | null>(null);
   const [useProfileContext, setUseProfileContext] = useState(true);
   const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false);
+  const [memoryWorthyMsgIds, setMemoryWorthyMsgIds] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     fetchConversations();
@@ -98,8 +102,18 @@ const ChatPage = () => {
               Messages: newMessages,
             };
           });
+
+          if (response.memoryWorthyUserMessageId) {
+          setMemoryWorthyMsgIds((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(response.memoryWorthyUserMessageId!);
+            return newSet;
+          });
+        }
+
           fetchConversations();
         }
+        fetchConversation(response.conversationId);
         setIsTyping(false);
       });
 
@@ -174,9 +188,9 @@ const ChatPage = () => {
       let systemPrompt: string | undefined = undefined;
 
       // Nếu là tin nhắn đầu tiên và dùng UserProfile
-      if (!conversation && useProfileContext) {
+      if (useProfileContext) {
         try {
-          const res = await getUserProfile(); 
+          const res = await getUserProfile();
           const profileJson = JSON.stringify(res, null, 2);
           systemPrompt = `Thông tin hồ sơ người dùng:\n${profileJson}\n---\nDùng thông tin này để hiểu rõ người dùng hơn`;
         } catch (err) {
@@ -496,7 +510,7 @@ const ChatPage = () => {
           <Button
             type="default"
             onClick={handleSuggestFromConversation}
-            icon={<BulbOutlined />}
+            icon={<FileSearchOutlined />}
             block
             style={{ marginTop: 8 }}
           >
@@ -547,135 +561,183 @@ const ChatPage = () => {
             {conversation && (
               <List
                 dataSource={conversation.Messages}
-                renderItem={(msg: Message, idx) => (
-                  <div
-                    className={`message-container ${
-                      msg.role === "user" ? "user" : ""
-                    }`}
-                  >
+                renderItem={(msg: Message) => {
+                  const isMemoryWorthy = memoryWorthyMsgIds.has(msg.id);
+
+                  return (
                     <div
-                      className={`message-bubble ${
-                        msg.role === "user" ? "user" : "assistant"
+                      className={`message-container ${
+                        msg.role === "user" ? "user" : ""
                       }`}
-                      style={{ position: "relative" }}
                     >
-                      {editingMessageId === msg.id ? (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            flexDirection: "column",
-                            gap: 4,
-                          }}
-                        >
-                          <Input.TextArea
-                            value={editValue}
-                            autoSize
-                            autoFocus
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onPressEnter={(e) => {
-                              if (!e.shiftKey) {
-                                e.preventDefault();
-                                setDeletingMessageId(msg.id);
-                              }
-                            }}
-                          />
+                      <div
+                        className={`message-bubble ${
+                          msg.role === "user" ? "user" : "assistant"
+                        }`}
+                        style={{ position: "relative" }}
+                      >
+                        {editingMessageId === msg.id ? (
                           <div
                             style={{
                               display: "flex",
-                              gap: 8,
-                              alignSelf: "flex-end",
+                              alignItems: "center",
+                              flexDirection: "column",
+                              gap: 4,
                             }}
                           >
-                            <Popconfirm
-                              title="Edit this message? (All below will be deleted and resent)"
-                              onConfirm={() => handleEditConfirm(msg)}
-                              onCancel={() => setEditingMessageId(null)}
-                              okText="Yes"
-                              cancelText="No"
-                              open={deletingMessageId === msg.id}
-                              onOpenChange={(open) => {
-                                if (!open) setDeletingMessageId(null);
+                            <Input.TextArea
+                              value={editValue}
+                              autoSize
+                              autoFocus
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onPressEnter={(e) => {
+                                if (!e.shiftKey) {
+                                  e.preventDefault();
+                                  setDeletingMessageId(msg.id);
+                                }
+                              }}
+                            />
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                alignSelf: "flex-end",
                               }}
                             >
-                              <Button
-                                type="primary"
-                                icon={<SendOutlined />}
-                                size="middle"
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
+                              <Popconfirm
+                                title="Edit this message? (All below will be deleted and resent)"
+                                onConfirm={() => handleEditConfirm(msg)}
+                                onCancel={() => setEditingMessageId(null)}
+                                okText="Yes"
+                                cancelText="No"
+                                open={deletingMessageId === msg.id}
+                                onOpenChange={(open) => {
+                                  if (!open) setDeletingMessageId(null);
                                 }}
-                                onClick={() => setDeletingMessageId(msg.id)}
                               >
-                                Send
-                              </Button>
-                            </Popconfirm>
-                            <Button
-                              type="default"
-                              size="middle"
-                              onClick={() => {
-                                setEditingMessageId(null);
-                                setEditValue("");
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : msg.role === "user" ? (
-                        <>
-                          <p style={{ margin: 0 }}>{msg.content}</p>
-                          <div className="message-actions">
-                            <Button
-                              icon={<CopyOutlined />}
-                              size="small"
-                              onClick={() => handleCopy(msg.content)}
-                            />
-                            <Button
-                              icon={<EditOutlined />}
-                              size="small"
-                              onClick={() => handleEditMessage(msg)}
-                            />
-                            <Button
-                              icon={<BulbOutlined />}
-                              size="small"
-                              onClick={() => handleSuggestFromMessage(msg.id)}
-                              title="Gợi ý cập nhật hồ sơ"
-                            />
-                            <Popconfirm
-                              title="Delete this message and all below?"
-                              onConfirm={() => handleDeleteMessage(msg)}
-                              okText="Yes"
-                              cancelText="No"
-                            >
+                                <Button
+                                  type="primary"
+                                  icon={<SendOutlined />}
+                                  size="middle"
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                  }}
+                                  onClick={() => setDeletingMessageId(msg.id)}
+                                >
+                                  Send
+                                </Button>
+                              </Popconfirm>
                               <Button
-                                icon={<DeleteOutlined />}
-                                danger
+                                type="default"
+                                size="middle"
+                                onClick={() => {
+                                  setEditingMessageId(null);
+                                  setEditValue("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : msg.role === "user" ? (
+                          <>
+                            <p style={{ margin: 0 }}>{msg.content}</p>
+                            <div className="message-actions">
+                              <Button
+                                icon={<CopyOutlined />}
                                 size="small"
+                                onClick={() => handleCopy(msg.content)}
                               />
-                            </Popconfirm>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="markdown-content">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
-                          </div>
-                          <div className="message-actions">
-                            <Button
-                              icon={<CopyOutlined />}
-                              size="small"
-                              onClick={() => handleCopy(msg.content)}
-                            />
-                          </div>
-                        </>
+                              <Button
+                                icon={<EditOutlined />}
+                                size="small"
+                                onClick={() => handleEditMessage(msg)}
+                              />
+                              <Button
+                                icon={<FileSearchOutlined />}
+                                size="small"
+                                onClick={() => handleSuggestFromMessage(msg.id)}
+                                title="Gợi ý cập nhật hồ sơ"
+                              />
+                              <Popconfirm
+                                title="Delete this message and all below?"
+                                onConfirm={() => handleDeleteMessage(msg)}
+                                okText="Yes"
+                                cancelText="No"
+                              >
+                                <Button
+                                  icon={<DeleteOutlined />}
+                                  danger
+                                  size="small"
+                                />
+                              </Popconfirm>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="markdown-content">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                            </div>
+                            <div className="message-actions">
+                              <Button
+                                icon={<CopyOutlined />}
+                                size="small"
+                                onClick={() => handleCopy(msg.content)}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* ✅ Suggestion outside bubble */}
+                      {isMemoryWorthy && (
+                        <div
+                          style={{
+                            fontStyle: "italic",
+                            fontSize: "13px",
+                            color: "#888",
+                            marginTop: 6,
+                            marginLeft: msg.role === "user" ? 16 : 48,
+                          }}
+                        >
+                          Cập nhật thông tin người dùng?
+                          <Button
+                            size="small"
+                            type="link"
+                            onClick={() => {
+                              handleSuggestFromMessage(msg.id);
+                              setMemoryWorthyMsgIds((prev) => {
+                                const updated = new Set(prev);
+                                updated.delete(msg.id);
+                                return updated;
+                              });
+                            }}
+                          >
+                            ✔️
+                          </Button>
+                          <Button
+                            size="small"
+                            type="link"
+                            danger
+                            onClick={() =>
+                              setMemoryWorthyMsgIds((prev) => {
+                                const updated = new Set(prev);
+                                updated.delete(msg.id);
+                                return updated;
+                              })
+                            }
+                          >
+                            ❌
+                          </Button>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  );
+                }}
               />
             )}
+
             {isTyping && (
               <div className="message-container">
                 <div className="message-bubble assistant typing">

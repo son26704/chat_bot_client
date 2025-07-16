@@ -31,6 +31,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   conversationId: string;
   message: Message;
+  memoryWorthyUserMessageId?: string;
 }
 
 export interface Message {
@@ -38,6 +39,7 @@ export interface Message {
   content: string;
   role: 'user' | 'assistant';
   createdAt: string;
+  isMemoryWorthy?: boolean; 
 }
 
 export interface Conversation {
@@ -46,6 +48,7 @@ export interface Conversation {
   Messages: Message[];
   createdAt: string;
   updatedAt: string;
+  isMemoryWorthy?: boolean; 
 }
 
 export interface FollowUpQuestionsResponse {
