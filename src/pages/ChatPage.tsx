@@ -8,7 +8,6 @@ import {
   Layout,
   Menu,
   Popconfirm,
-  Modal,
   Spin,
 } from "antd";
 import {
@@ -21,7 +20,6 @@ import {
   MenuUnfoldOutlined,
   CopyOutlined,
   BulbOutlined,
-  CloseOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -34,8 +32,12 @@ import {
   deleteMessage,
   editMessage,
   getFollowUpQuestions,
+  getSuggestedProfileFromMessage,
+  getSuggestedProfileFromConversation,
+  getUserProfile,
 } from "../services/authService";
 import UserProfileModal from "./UserProfileModal";
+import UserProfileSuggestModal from "./UserProfileSuggestModal";
 import type { Message, Conversation, ChatResponse } from "../types/auth";
 import ReactMarkdown from "react-markdown";
 
@@ -64,6 +66,13 @@ const ChatPage = () => {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
+  const [suggestedProfileData, setSuggestedProfileData] = useState<Record<
+    string,
+    string[]
+  > | null>(null);
+  const [useProfileContext, setUseProfileContext] = useState(true);
+  const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false);
 
   useEffect(() => {
     fetchConversations();
@@ -138,6 +147,9 @@ const ChatPage = () => {
     try {
       const conv = await getConversationHistory(conversationId);
       setConversation(conv);
+      if (conv.Messages && conv.Messages.length > 0) {
+        setHasSentFirstMessage(true);
+      }
     } catch (error) {
       message.error("Failed to load conversation");
     }
@@ -148,6 +160,7 @@ const ChatPage = () => {
       message.error("Please enter a message");
       return;
     }
+    if (!hasSentFirstMessage) setHasSentFirstMessage(true);
     setPrompt("");
     try {
       const userMessage: Message = {
@@ -158,6 +171,18 @@ const ChatPage = () => {
       };
 
       const currentConversation = conversation;
+      let systemPrompt: string | undefined = undefined;
+
+      // Nếu là tin nhắn đầu tiên và dùng UserProfile
+      if (!conversation && useProfileContext) {
+        try {
+          const res = await getUserProfile(); 
+          const profileJson = JSON.stringify(res, null, 2);
+          systemPrompt = `Thông tin hồ sơ người dùng:\n${profileJson}\n---\nDùng thông tin này để hiểu rõ người dùng hơn`;
+        } catch (err) {
+          console.warn("Không thể lấy hồ sơ người dùng", err);
+        }
+      }
 
       setConversation((prev) => {
         if (!prev) {
@@ -183,6 +208,7 @@ const ChatPage = () => {
           currentConversation?.id === "temp"
             ? undefined
             : currentConversation?.id,
+        ...(systemPrompt ? { systemPrompt } : {}),
       });
       await fetchConversations();
     } catch (error) {
@@ -202,6 +228,8 @@ const ChatPage = () => {
     setConversation(null);
     setPrompt("");
     setIsStartingNewConversation(true);
+    setHasSentFirstMessage(false);
+    setUseProfileContext(true);
   };
 
   const handleDeleteConversation = async (convId: string) => {
@@ -309,6 +337,31 @@ const ChatPage = () => {
       message.error("Failed to load suggestions");
     } finally {
       setLoadingSuggestions(false);
+    }
+  };
+
+  const handleSuggestFromMessage = async (messageId: string) => {
+    try {
+      const data = await getSuggestedProfileFromMessage(messageId);
+      setSuggestedProfileData(data);
+      setShowSuggestModal(true);
+    } catch (error) {
+      message.error("Không thể gợi ý từ tin nhắn");
+    }
+  };
+
+  const handleSuggestFromConversation = async () => {
+    if (!conversation?.id) {
+      console.warn("⚠️ No conversation selected");
+      return;
+    }
+    try {
+      const data = await getSuggestedProfileFromConversation(conversation.id);
+      setSuggestedProfileData(data);
+      setShowSuggestModal(true);
+    } catch (error) {
+      console.error("❌ Error in handleSuggestFromConversation:", error);
+      message.error("Không thể gợi ý từ cuộc trò chuyện");
     }
   };
 
@@ -439,6 +492,15 @@ const ChatPage = () => {
             style={{ marginTop: 8 }}
           >
             Hồ sơ người dùng
+          </Button>
+          <Button
+            type="default"
+            onClick={handleSuggestFromConversation}
+            icon={<BulbOutlined />}
+            block
+            style={{ marginTop: 8 }}
+          >
+            Gợi ý từ hội thoại
           </Button>
         </div>
       </Sider>
@@ -575,6 +637,12 @@ const ChatPage = () => {
                               size="small"
                               onClick={() => handleEditMessage(msg)}
                             />
+                            <Button
+                              icon={<BulbOutlined />}
+                              size="small"
+                              onClick={() => handleSuggestFromMessage(msg.id)}
+                              title="Gợi ý cập nhật hồ sơ"
+                            />
                             <Popconfirm
                               title="Delete this message and all below?"
                               onConfirm={() => handleDeleteMessage(msg)}
@@ -621,6 +689,42 @@ const ChatPage = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {!hasSentFirstMessage && (
+            <div
+              style={{
+                padding: "12px 24px",
+                background: "#fff",
+                borderBottom: "1px solid #f0f0f0",
+              }}
+            >
+              <Typography.Text
+                strong
+                style={{ display: "block", marginBottom: 8 }}
+              >
+                🎯 Chế độ bắt đầu hội thoại:
+              </Typography.Text>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <Button
+                  type={useProfileContext ? "primary" : "default"}
+                  onClick={() => setUseProfileContext(true)}
+                >
+                  Dùng User Profile
+                </Button>
+                <Button
+                  type={!useProfileContext ? "primary" : "default"}
+                  onClick={() => setUseProfileContext(false)}
+                >
+                  Không dùng Profile
+                </Button>
+                <Typography.Text type="secondary" style={{ marginLeft: 12 }}>
+                  {useProfileContext
+                    ? "AI sẽ dùng hồ sơ người dùng để hiểu bạn rõ hơn"
+                    : "AI sẽ không dùng hồ sơ, chỉ phản hồi theo câu hỏi hiện tại"}
+                </Typography.Text>
+              </div>
+            </div>
+          )}
 
           <div className="chat-input-container input-with-icons">
             <TextArea
@@ -699,6 +803,11 @@ const ChatPage = () => {
         <UserProfileModal
           visible={showProfileModal}
           onClose={() => setShowProfileModal(false)}
+        />
+        <UserProfileSuggestModal
+          visible={showSuggestModal}
+          onClose={() => setShowSuggestModal(false)}
+          data={suggestedProfileData}
         />
       </Content>
     </Layout>

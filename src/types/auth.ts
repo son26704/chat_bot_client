@@ -25,6 +25,7 @@ export interface User {
 export interface ChatRequest {
   prompt: string;
   conversationId?: string;
+  systemPrompt?: string; // Thêm trường này để gửi prompt hệ thống nếu có
 }
 
 export interface ChatResponse {

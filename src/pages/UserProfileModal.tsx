@@ -4,11 +4,11 @@ import {
   Modal,
   Input,
   Typography,
-  Space,
   Divider,
-  Popconfirm,
   message,
   Tooltip,
+  Row,
+  Col,
 } from "antd";
 import {
   PlusOutlined,
@@ -21,7 +21,13 @@ import { getUserProfile, updateUserProfile } from "../services/authService";
 
 const { Title, Text } = Typography;
 
-const UserProfileModal = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
+const UserProfileModal = ({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) => {
   const [profile, setProfile] = useState<Record<string, string[]>>({});
   const [editing, setEditing] = useState(false);
   const [tempProfile, setTempProfile] = useState<Record<string, string[]>>({});
@@ -45,11 +51,12 @@ const UserProfileModal = ({ visible, onClose }: { visible: boolean; onClose: () 
   };
 
   const validateAndSave = async () => {
-    // Validate: không được có trường hoặc giá trị rỗng
     for (const [key, values] of Object.entries(tempProfile)) {
       if (!key.trim()) return message.error("Tên trường không được để trống");
-      if (!values.length) return message.error(`Trường "${key}" phải có ít nhất 1 giá trị`);
-      if (values.some((v) => !v.trim())) return message.error(`Trường "${key}" chứa giá trị rỗng`);
+      if (!values.length)
+        return message.error(`Trường "${key}" phải có ít nhất 1 giá trị`);
+      if (values.some((v) => !v.trim()))
+        return message.error(`Trường "${key}" chứa giá trị rỗng`);
     }
 
     Modal.confirm({
@@ -118,76 +125,123 @@ const UserProfileModal = ({ visible, onClose }: { visible: boolean; onClose: () 
       open={visible}
       onCancel={onClose}
       footer={null}
-      title={<Title level={4}>🧾 User Profile</Title>}
-      width={700}
+      title={<Title level={4}>🧾 Hồ sơ người dùng</Title>}
+      width={800}
       maskClosable={false}
     >
       {!editing ? (
         <div>
           {Object.entries(profile).map(([field, values]) => (
-            <div key={field} style={{ marginBottom: 20 }}>
-              <Text strong>{field}:</Text>
-              <ul style={{ paddingLeft: 20, marginTop: 4 }}>
-                {values.map((v, idx) => (
-                  <li key={idx}>{v || <em>(rỗng)</em>}</li>
-                ))}
-              </ul>
+            <div key={field} style={{ marginBottom: 16 }}>
+              <Row gutter={16}>
+                <Col span={6}>
+                  <Text strong style={{ fontSize: "15px" }}>
+                    {field}:
+                  </Text>
+                </Col>
+                <Col span={18}>
+                  {values.length === 0 ? (
+                    <Text type="secondary" italic>
+                      (Không có dữ liệu)
+                    </Text>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      {values.map((v, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            background: "#f5f5f5",
+                            padding: "6px 10px",
+                            borderRadius: 6,
+                            fontSize: "14px",
+                            border: "1px solid #e0e0e0",
+                            maxWidth: "100%",
+                          }}
+                        >
+                          {v || <em>(rỗng)</em>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Col>
+              </Row>
             </div>
           ))}
+
           <Button icon={<EditOutlined />} onClick={handleEdit} type="primary">
             Chỉnh sửa
           </Button>
         </div>
       ) : (
         <div>
-          {Object.entries(tempProfile).map(([field, values], fieldIdx) => (
-            <div key={fieldIdx} style={{ marginBottom: 24 }}>
-              <Space align="baseline">
-                <Input
-                  value={field}
-                  onChange={(e) => handleFieldChange(field, e.target.value)}
-                  style={{ fontWeight: 600, width: 200 }}
-                />
-                <Tooltip title="Xóa trường">
-                  <Button
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    danger
-                    onClick={() => removeField(field)}
+          {Object.entries(tempProfile).map(([field, values], idx) => (
+            <div key={idx} style={{ marginBottom: 24 }}>
+              <Row gutter={16} align="top">
+                <Col span={6}>
+                  <Input
+                    value={field}
+                    onChange={(e) => handleFieldChange(field, e.target.value)}
+                    style={{ fontWeight: 600 }}
                   />
-                </Tooltip>
-              </Space>
-              <div style={{ marginTop: 8 }}>
-                {values.map((val, idx) => (
-                  <div key={idx} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                    <Input.TextArea
-                      rows={1}
-                      value={val}
-                      onChange={(e) => handleValueChange(field, idx, e.target.value)}
+                  <Tooltip title="Xóa trường">
+                    <Button
+                      icon={<DeleteOutlined />}
+                      danger
+                      size="small"
+                      style={{ marginTop: 8 }}
+                      onClick={() => removeField(field)}
                     />
-                    <Tooltip title="Xóa dòng">
-                      <Button
-                        icon={<DeleteOutlined />}
-                        danger
-                        size="small"
-                        onClick={() => removeValue(field, idx)}
+                  </Tooltip>
+                </Col>
+                <Col span={18}>
+                  {values.map((val, valIdx) => (
+                    <div
+                      key={valIdx}
+                      style={{ display: "flex", gap: 8, marginBottom: 6 }}
+                    >
+                      <Input.TextArea
+                        rows={1}
+                        value={val}
+                        onChange={(e) =>
+                          handleValueChange(field, valIdx, e.target.value)
+                        }
                       />
-                    </Tooltip>
-                  </div>
-                ))}
-                <Button
-                  icon={<PlusOutlined />}
-                  size="small"
-                  onClick={() => addValue(field)}
-                  disabled={values.some((v) => !v.trim())}
-                >
-                  Thêm dòng
-                </Button>
-              </div>
-              <Divider style={{ margin: "16px 0" }} />
+                      <Tooltip title="Xóa dòng">
+                        <Button
+                          icon={<DeleteOutlined />}
+                          danger
+                          size="small"
+                          onClick={() => removeValue(field, valIdx)}
+                        />
+                      </Tooltip>
+                    </div>
+                  ))}
+                  <Button
+                    icon={<PlusOutlined />}
+                    size="small"
+                    onClick={() => addValue(field)}
+                    disabled={values.some((v) => !v.trim())}
+                  >
+                    Thêm dòng
+                  </Button>
+                </Col>
+              </Row>
+              <Divider />
             </div>
           ))}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <Button icon={<PlusOutlined />} onClick={addField}>
               Thêm trường
             </Button>
@@ -195,7 +249,11 @@ const UserProfileModal = ({ visible, onClose }: { visible: boolean; onClose: () 
               <Button onClick={handleCancelEdit} style={{ marginRight: 8 }}>
                 Hủy
               </Button>
-              <Button type="primary" onClick={validateAndSave} icon={<SaveOutlined />}>
+              <Button
+                type="primary"
+                onClick={validateAndSave}
+                icon={<SaveOutlined />}
+              >
                 Lưu
               </Button>
             </div>

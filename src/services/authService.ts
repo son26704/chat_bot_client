@@ -136,3 +136,43 @@ export const getUserProfile = async (): Promise<Record<string, string[]>> => {
 export const updateUserProfile = async (data: Record<string, string[]>) => {
   return await api.put('/profile', data);
 };
+
+export const getSuggestedProfileFromMessage = async (
+  messageId: string
+): Promise<Record<string, string[]>> => {
+  try {
+    const res = await api.get<{ result: string }>(`/profile/suggest-from-message/${messageId}`);
+    
+    const cleanResult = res.data.result.replace(/```json|```/g, "").trim();
+    
+    const parsed = JSON.parse(cleanResult);
+    
+    if (!parsed.profile) {
+      return {};
+    }
+    
+    return parsed.profile;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getSuggestedProfileFromConversation = async (
+  conversationId: string
+): Promise<Record<string, string[]>> => {
+  try {
+    const res = await api.get<{ result: string }>(`/profile/suggest-from-conversation/${conversationId}`);
+    
+    const cleanResult = res.data.result.replace(/```json|```/g, "").trim();
+    
+    const parsed = JSON.parse(cleanResult);
+    
+    if (!parsed.profile) {
+      return {};
+    }
+    
+    return parsed.profile;
+  } catch (error) {
+    throw error;
+  }
+};
