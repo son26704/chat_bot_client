@@ -30,7 +30,8 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   conversationId: string;
-  message: Message;
+  userMessage: Message;
+  assistantMessage: Message;
   memoryWorthyUserMessageId?: string;
 }
 

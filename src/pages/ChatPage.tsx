@@ -91,29 +91,35 @@ const ChatPage = () => {
           setConversation((prev) => {
             if (!prev) return null;
 
-            const newMessages =
-              prev.id === "temp"
-                ? [prev.Messages[0], response.message]
-                : [...prev.Messages, response.message];
+            const updatedMessages = [...prev.Messages];
+
+            // Ghi đè lại tin nhắn cuối (ID tạm) bằng userMessage ID thật
+            if (
+              updatedMessages.length > 0 &&
+              updatedMessages[updatedMessages.length - 1].role === "user"
+            ) {
+              updatedMessages[updatedMessages.length - 1] =
+                response.userMessage;
+            }
+
+            // Thêm assistantMessage vào
+            updatedMessages.push(response.assistantMessage);
 
             return {
               ...prev,
               id: response.conversationId,
-              Messages: newMessages,
+              Messages: updatedMessages,
             };
           });
 
           if (response.memoryWorthyUserMessageId) {
-          setMemoryWorthyMsgIds((prev) => {
-            const newSet = new Set(prev);
-            newSet.add(response.memoryWorthyUserMessageId!);
-            return newSet;
-          });
+            setMemoryWorthyMsgIds((prev) => {
+              const newSet = new Set(prev);
+              newSet.add(response.memoryWorthyUserMessageId!);
+              return newSet;
+            });
+          }
         }
-
-          fetchConversations();
-        }
-        fetchConversation(response.conversationId);
         setIsTyping(false);
       });
 
