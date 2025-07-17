@@ -1,14 +1,24 @@
-import { Modal, Button, Input, Typography, Divider, Tooltip, Row, Col, message } from "antd";
+// client/src/pages/UserProfileSuggestModal.tsx
+import {
+  Modal,
+  Button,
+  Input,
+  Typography,
+  Divider,
+  Tooltip,
+  Row,
+  Col,
+  message,
+} from "antd";
 import { useState, useEffect } from "react";
 import {
   DeleteOutlined,
   SaveOutlined,
-  PlusOutlined,
   ExclamationCircleOutlined,
 } from "@ant-design/icons";
 import { updateUserProfile } from "../services/authService";
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 const UserProfileSuggestModal = ({
   visible,
@@ -17,51 +27,71 @@ const UserProfileSuggestModal = ({
 }: {
   visible: boolean;
   onClose: () => void;
-  data: Record<string, string[]> | null;
+  data: Record<string, string> | null;
 }) => {
-  const [profile, setProfile] = useState<Record<string, string[]>>({});
+  const [profile, setProfile] = useState<Record<string, string>>({});
+  // Thêm state để track thứ tự các field với ID ổn định
+  const [fields, setFields] = useState<Array<{id: string, key: string, value: string}>>([]);
+  const [nextId, setNextId] = useState(1);
 
   useEffect(() => {
     if (visible && data) {
       setProfile(data);
+      // Chuyển object thành array với ID ổn định
+      const fieldsArray = Object.entries(data).map(([key, value], index) => ({
+        id: `field_${index}`,
+        key,
+        value
+      }));
+      setFields(fieldsArray);
+      setNextId(fieldsArray.length);
+    } else {
+      setProfile({});
+      setFields([]);
     }
   }, [visible, data]);
 
-  const handleChangeKey = (oldKey: string, newKey: string) => {
-    const updated = { ...profile };
-    updated[newKey] = updated[oldKey];
-    delete updated[oldKey];
-    setProfile(updated);
+  const handleChangeKey = (fieldId: string, newKey: string) => {
+    setFields(fields.map(field => 
+      field.id === fieldId ? { ...field, key: newKey } : field
+    ));
   };
 
-  const handleChangeValue = (key: string, index: number, value: string) => {
-    const updated = [...(profile[key] || [])];
-    updated[index] = value;
-    setProfile({ ...profile, [key]: updated });
+  const handleChangeValue = (fieldId: string, newValue: string) => {
+    setFields(fields.map(field => 
+      field.id === fieldId ? { ...field, value: newValue } : field
+    ));
   };
 
-  const addValue = (key: string) => {
-    if (profile[key].some((v) => !v.trim())) return;
-    setProfile({ ...profile, [key]: [...profile[key], ""] });
-  };
-
-  const removeValue = (key: string, idx: number) => {
-    const values = [...(profile[key] || [])];
-    values.splice(idx, 1);
-    setProfile({ ...profile, [key]: values });
-  };
-
-  const removeField = (key: string) => {
-    const updated = { ...profile };
-    delete updated[key];
-    setProfile(updated);
+  const removeField = (fieldId: string) => {
+    setFields(fields.filter(field => field.id !== fieldId));
   };
 
   const validateAndSubmit = () => {
-    for (const [key, values] of Object.entries(profile)) {
-      if (!key.trim()) return message.error("Tên trường không được để trống");
-      if (!values.length) return message.error(`Trường "${key}" phải có ít nhất 1 giá trị`);
-      if (values.some((v) => !v.trim())) return message.error(`Trường "${key}" chứa giá trị rỗng`);
+    // Kiểm tra các trường có nội dung
+    const nonEmptyFields: Record<string, string> = {};
+    
+    for (const field of fields) {
+      const trimmedKey = field.key.trim();
+      const trimmedValue = field.value.trim();
+      
+      // Bỏ qua nếu cả key và value đều rỗng
+      if (!trimmedKey && !trimmedValue) continue;
+      
+      // Kiểm tra key không được rỗng nếu có value
+      if (!trimmedKey && trimmedValue) {
+        return message.error("Tên trường không được để trống khi có giá trị");
+      }
+      
+      // Kiểm tra value không được rỗng nếu có key
+      if (trimmedKey && !trimmedValue) {
+        return message.error(`Giá trị của "${trimmedKey}" không được để trống`);
+      }
+      
+      // Thêm vào danh sách các trường hợp lệ
+      if (trimmedKey && trimmedValue) {
+        nonEmptyFields[trimmedKey] = trimmedValue;
+      }
     }
 
     Modal.confirm({
@@ -69,7 +99,7 @@ const UserProfileSuggestModal = ({
       icon: <ExclamationCircleOutlined />,
       onOk: async () => {
         try {
-          await updateUserProfile(profile);
+          await updateUserProfile(nonEmptyFields);
           message.success("Đã cập nhật hồ sơ");
           onClose();
         } catch {
@@ -77,6 +107,42 @@ const UserProfileSuggestModal = ({
         }
       },
     });
+  };
+
+  // Render fields theo thứ tự đã lưu
+  const renderFields = () => {
+    return fields.map((field) => (
+      <div key={field.id} style={{ marginBottom: 24 }}>
+        <Row gutter={16} align="top">
+          <Col span={6}>
+            <Input
+              value={field.key}
+              onChange={(e) => handleChangeKey(field.id, e.target.value)}
+              style={{ fontWeight: 600 }}
+              placeholder="Tên trường..."
+            />
+            <Tooltip title="Xóa trường">
+              <Button
+                icon={<DeleteOutlined />}
+                danger
+                size="small"
+                style={{ marginTop: 8 }}
+                onClick={() => removeField(field.id)}
+              />
+            </Tooltip>
+          </Col>
+          <Col span={18}>
+            <Input.TextArea
+              rows={1}
+              value={field.value}
+              onChange={(e) => handleChangeValue(field.id, e.target.value)}
+              placeholder="Giá trị..."
+            />
+          </Col>
+        </Row>
+        <Divider />
+      </div>
+    ));
   };
 
   return (
@@ -87,69 +153,18 @@ const UserProfileSuggestModal = ({
       title={<Title level={4}>🧠 Gợi ý cập nhật hồ sơ</Title>}
       width={800}
       maskClosable={false}
-      destroyOnHidden={true}
+      destroyOnClose={true}
     >
-      {Object.keys(profile).length === 0 ? (
-        <div style={{ textAlign: "center", padding: 20 }}>
-          <Text type="secondary">Không có dữ liệu gợi ý</Text>
-        </div>
-      ) : (
-        Object.entries(profile).map(([key, values], idx) => (
-          <div key={idx} style={{ marginBottom: 24 }}>
-            <Row gutter={16} align="top">
-              <Col span={6}>
-                <Input
-                  value={key}
-                  onChange={(e) => handleChangeKey(key, e.target.value)}
-                  style={{ fontWeight: 600 }}
-                />
-                <Tooltip title="Xóa trường">
-                  <Button
-                    icon={<DeleteOutlined />}
-                    danger
-                    size="small"
-                    style={{ marginTop: 8 }}
-                    onClick={() => removeField(key)}
-                  />
-                </Tooltip>
-              </Col>
-              <Col span={18}>
-                {values.map((val, valIdx) => (
-                  <div key={valIdx} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                    <Input.TextArea
-                      rows={1}
-                      value={val}
-                      onChange={(e) => handleChangeValue(key, valIdx, e.target.value)}
-                    />
-                    <Tooltip title="Xóa dòng">
-                      <Button
-                        icon={<DeleteOutlined />}
-                        danger
-                        size="small"
-                        onClick={() => removeValue(key, valIdx)}
-                      />
-                    </Tooltip>
-                  </div>
-                ))}
-                <Button
-                  icon={<PlusOutlined />}
-                  size="small"
-                  onClick={() => addValue(key)}
-                  disabled={values.some((v) => !v.trim())}
-                >
-                  Thêm dòng
-                </Button>
-              </Col>
-            </Row>
-            <Divider />
-          </div>
-        ))
-      )}
+      {renderFields()}
       <div style={{ display: "flex", justifyContent: "end" }}>
         <Button onClick={onClose} style={{ marginRight: 8 }}>
           Hủy
         </Button>
-        <Button type="primary" icon={<SaveOutlined />} onClick={validateAndSubmit}>
+        <Button
+          type="primary"
+          icon={<SaveOutlined />}
+          onClick={validateAndSubmit}
+        >
           Lưu
         </Button>
       </div>

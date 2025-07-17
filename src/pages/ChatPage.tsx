@@ -1,3 +1,4 @@
+// client/src/pages/ChatPage.tsx
 import { useState, useEffect, useRef } from "react";
 import {
   Button,
@@ -70,7 +71,7 @@ const ChatPage = () => {
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [suggestedProfileData, setSuggestedProfileData] = useState<Record<
     string,
-    string[]
+    string
   > | null>(null);
   const [useProfileContext, setUseProfileContext] = useState(true);
   const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false);
@@ -874,7 +875,10 @@ const ChatPage = () => {
         />
         <UserProfileSuggestModal
           visible={showSuggestModal}
-          onClose={() => setShowSuggestModal(false)}
+          onClose={() => {
+            setShowSuggestModal(false);
+            setSuggestedProfileData(null);
+          }}
           data={suggestedProfileData}
         />
       </Content>

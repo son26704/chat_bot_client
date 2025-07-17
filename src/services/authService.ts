@@ -127,19 +127,19 @@ export const getFollowUpQuestions = async (conversationId: string): Promise<Foll
   return response.data;
 };
 
-export const getUserProfile = async (): Promise<Record<string, string[]>> => {
-  const response = await api.get<Record<string, string[]>>('/profile');
+export const getUserProfile = async (): Promise<Record<string, string>> => {
+  const response = await api.get<Record<string, string>>('/profile');
   return response.data;
 };
 
 
-export const updateUserProfile = async (data: Record<string, string[]>) => {
+export const updateUserProfile = async (data: Record<string, string>) => {
   return await api.put('/profile', data);
 };
 
 export const getSuggestedProfileFromMessage = async (
   messageId: string
-): Promise<Record<string, string[]>> => {
+): Promise<Record<string, string>> => {
   try {
     const res = await api.get<{ result: string }>(`/profile/suggest-from-message/${messageId}`);
     
@@ -159,7 +159,7 @@ export const getSuggestedProfileFromMessage = async (
 
 export const getSuggestedProfileFromConversation = async (
   conversationId: string
-): Promise<Record<string, string[]>> => {
+): Promise<Record<string, string>> => {
   try {
     const res = await api.get<{ result: string }>(`/profile/suggest-from-conversation/${conversationId}`);
     

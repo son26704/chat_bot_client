@@ -1,3 +1,4 @@
+// client/src/pages/UserProfileModal.tsx
 import { useEffect, useState } from "react";
 import {
   Button,
@@ -28,35 +29,80 @@ const UserProfileModal = ({
   visible: boolean;
   onClose: () => void;
 }) => {
-  const [profile, setProfile] = useState<Record<string, string[]>>({});
+  const [profile, setProfile] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState(false);
-  const [tempProfile, setTempProfile] = useState<Record<string, string[]>>({});
+  const [tempProfile, setTempProfile] = useState<Record<string, string>>({});
+  // Thêm state để track thứ tự các field với ID ổn định
+  const [fields, setFields] = useState<Array<{id: string, key: string, value: string}>>([]);
+  const [nextId, setNextId] = useState(1);
 
   useEffect(() => {
     if (visible) {
       getUserProfile()
-        .then(setProfile)
+        .then((res) => {
+          setProfile(res);
+          // Chuyển object thành array với ID ổn định
+          const fieldsArray = Object.entries(res).map(([key, value], index) => ({
+            id: `field_${index}`,
+            key,
+            value
+          }));
+          setFields(fieldsArray);
+          setNextId(fieldsArray.length);
+          setEditing(false);
+          setTempProfile({});
+        })
         .catch(() => message.error("Không tải được hồ sơ người dùng"));
     }
   }, [visible]);
 
   const handleEdit = () => {
-    setTempProfile(JSON.parse(JSON.stringify(profile)));
+    // Chuyển profile thành tempProfile format
+    const tempData: Record<string, string> = {};
+    fields.forEach(field => {
+      tempData[field.key] = field.value;
+    });
+    setTempProfile(tempData);
     setEditing(true);
   };
 
   const handleCancelEdit = () => {
     setEditing(false);
     setTempProfile({});
+    // Reset lại fields từ profile gốc
+    const fieldsArray = Object.entries(profile).map(([key, value], index) => ({
+      id: `field_${index}`,
+      key,
+      value
+    }));
+    setFields(fieldsArray);
   };
 
   const validateAndSave = async () => {
-    for (const [key, values] of Object.entries(tempProfile)) {
-      if (!key.trim()) return message.error("Tên trường không được để trống");
-      if (!values.length)
-        return message.error(`Trường "${key}" phải có ít nhất 1 giá trị`);
-      if (values.some((v) => !v.trim()))
-        return message.error(`Trường "${key}" chứa giá trị rỗng`);
+    // Kiểm tra các trường có nội dung
+    const nonEmptyFields: Record<string, string> = {};
+    
+    for (const field of fields) {
+      const trimmedKey = field.key.trim();
+      const trimmedValue = field.value.trim();
+      
+      // Bỏ qua nếu cả key và value đều rỗng
+      if (!trimmedKey && !trimmedValue) continue;
+      
+      // Kiểm tra key không được rỗng nếu có value
+      if (!trimmedKey && trimmedValue) {
+        return message.error("Tên trường không được để trống khi có giá trị");
+      }
+      
+      // Kiểm tra value không được rỗng nếu có key
+      if (trimmedKey && !trimmedValue) {
+        return message.error(`Giá trị của "${trimmedKey}" không được để trống`);
+      }
+      
+      // Thêm vào danh sách các trường hợp lệ
+      if (trimmedKey && trimmedValue) {
+        nonEmptyFields[trimmedKey] = trimmedValue;
+      }
     }
 
     Modal.confirm({
@@ -66,8 +112,16 @@ const UserProfileModal = ({
       cancelText: "Hủy",
       onOk: async () => {
         try {
-          await updateUserProfile(tempProfile);
-          setProfile(tempProfile);
+          await updateUserProfile(nonEmptyFields);
+          setProfile(nonEmptyFields);
+          // Cập nhật lại fields sau khi save
+          const fieldsArray = Object.entries(nonEmptyFields).map(([key, value], index) => ({
+            id: `field_${index}`,
+            key,
+            value
+          }));
+          setFields(fieldsArray);
+          setNextId(fieldsArray.length);
           message.success("Đã lưu hồ sơ");
           setEditing(false);
         } catch {
@@ -77,47 +131,101 @@ const UserProfileModal = ({
     });
   };
 
-  const handleFieldChange = (oldKey: string, newKey: string) => {
-    if (!newKey.trim()) return;
-    const updated = { ...tempProfile };
-    const value = updated[oldKey];
-    delete updated[oldKey];
-    updated[newKey] = value;
-    setTempProfile(updated);
+  const handleFieldChange = (fieldId: string, newKey: string) => {
+    setFields(fields.map(field => 
+      field.id === fieldId ? { ...field, key: newKey } : field
+    ));
   };
 
-  const handleValueChange = (field: string, index: number, value: string) => {
-    const updated = [...(tempProfile[field] || [])];
-    updated[index] = value;
-    setTempProfile({ ...tempProfile, [field]: updated });
+  const handleValueChange = (fieldId: string, newValue: string) => {
+    setFields(fields.map(field => 
+      field.id === fieldId ? { ...field, value: newValue } : field
+    ));
   };
 
-  const addValue = (field: string) => {
-    const existing = tempProfile[field] || [];
-    if (existing.some((v) => !v.trim())) return;
-    setTempProfile({ ...tempProfile, [field]: [...existing, ""] });
-  };
-
-  const removeValue = (field: string, index: number) => {
-    const updated = [...(tempProfile[field] || [])];
-    updated.splice(index, 1);
-    setTempProfile({ ...tempProfile, [field]: updated });
-  };
-
-  const removeField = (field: string) => {
-    const updated = { ...tempProfile };
-    delete updated[field];
-    setTempProfile(updated);
+  const removeField = (fieldId: string) => {
+    setFields(fields.filter(field => field.id !== fieldId));
   };
 
   const addField = () => {
-    const defaultName = "Trường mới";
-    let newKey = defaultName;
-    let count = 1;
-    while (tempProfile[newKey]) {
-      newKey = `${defaultName} ${count++}`;
+    const newField = {
+      id: `field_${nextId}`,
+      key: "Trường mới",
+      value: ""
+    };
+    setFields([...fields, newField]);
+    setNextId(nextId + 1);
+  };
+
+  // Render fields theo thứ tự đã lưu
+  const renderFields = () => {
+    if (!editing) {
+      return Object.entries(profile).map(([field, value], index) => (
+        <div key={field} style={{ marginBottom: 16 }}>
+          <Row gutter={16}>
+            <Col span={6}>
+              <Text strong style={{ fontSize: "15px" }}>
+                {field}:
+              </Text>
+            </Col>
+            <Col span={18}>
+              {value?.trim() ? (
+                <div
+                  style={{
+                    background: "#f5f5f5",
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    fontSize: "14px",
+                    border: "1px solid #e0e0e0",
+                    maxWidth: "100%",
+                  }}
+                >
+                  {value}
+                </div>
+              ) : (
+                <Text type="secondary" italic>
+                  (Không có dữ liệu)
+                </Text>
+              )}
+            </Col>
+          </Row>
+        </div>
+      ));
     }
-    setTempProfile({ ...tempProfile, [newKey]: [""] });
+
+    // Render theo thứ tự đã định với ID ổn định
+    return fields.map((field) => (
+      <div key={field.id} style={{ marginBottom: 24 }}>
+        <Row gutter={16} align="top">
+          <Col span={6}>
+            <Input
+              value={field.key}
+              onChange={(e) => handleFieldChange(field.id, e.target.value)}
+              style={{ fontWeight: 600 }}
+              placeholder="Tên trường..."
+            />
+            <Tooltip title="Xóa trường">
+              <Button
+                icon={<DeleteOutlined />}
+                danger
+                size="small"
+                style={{ marginTop: 8 }}
+                onClick={() => removeField(field.id)}
+              />
+            </Tooltip>
+          </Col>
+          <Col span={18}>
+            <Input.TextArea
+              rows={1}
+              value={field.value}
+              onChange={(e) => handleValueChange(field.id, e.target.value)}
+              placeholder="Giá trị..."
+            />
+          </Col>
+        </Row>
+        <Divider />
+      </div>
+    ));
   };
 
   return (
@@ -131,110 +239,14 @@ const UserProfileModal = ({
     >
       {!editing ? (
         <div>
-          {Object.entries(profile).map(([field, values]) => (
-            <div key={field} style={{ marginBottom: 16 }}>
-              <Row gutter={16}>
-                <Col span={6}>
-                  <Text strong style={{ fontSize: "15px" }}>
-                    {field}:
-                  </Text>
-                </Col>
-                <Col span={18}>
-                  {values.length === 0 ? (
-                    <Text type="secondary" italic>
-                      (Không có dữ liệu)
-                    </Text>
-                  ) : (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 4,
-                      }}
-                    >
-                      {values.map((v, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            background: "#f5f5f5",
-                            padding: "6px 10px",
-                            borderRadius: 6,
-                            fontSize: "14px",
-                            border: "1px solid #e0e0e0",
-                            maxWidth: "100%",
-                          }}
-                        >
-                          {v || <em>(rỗng)</em>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </Col>
-              </Row>
-            </div>
-          ))}
-
+          {renderFields()}
           <Button icon={<EditOutlined />} onClick={handleEdit} type="primary">
             Chỉnh sửa
           </Button>
         </div>
       ) : (
         <div>
-          {Object.entries(tempProfile).map(([field, values], idx) => (
-            <div key={idx} style={{ marginBottom: 24 }}>
-              <Row gutter={16} align="top">
-                <Col span={6}>
-                  <Input
-                    value={field}
-                    onChange={(e) => handleFieldChange(field, e.target.value)}
-                    style={{ fontWeight: 600 }}
-                  />
-                  <Tooltip title="Xóa trường">
-                    <Button
-                      icon={<DeleteOutlined />}
-                      danger
-                      size="small"
-                      style={{ marginTop: 8 }}
-                      onClick={() => removeField(field)}
-                    />
-                  </Tooltip>
-                </Col>
-                <Col span={18}>
-                  {values.map((val, valIdx) => (
-                    <div
-                      key={valIdx}
-                      style={{ display: "flex", gap: 8, marginBottom: 6 }}
-                    >
-                      <Input.TextArea
-                        rows={1}
-                        value={val}
-                        onChange={(e) =>
-                          handleValueChange(field, valIdx, e.target.value)
-                        }
-                      />
-                      <Tooltip title="Xóa dòng">
-                        <Button
-                          icon={<DeleteOutlined />}
-                          danger
-                          size="small"
-                          onClick={() => removeValue(field, valIdx)}
-                        />
-                      </Tooltip>
-                    </div>
-                  ))}
-                  <Button
-                    icon={<PlusOutlined />}
-                    size="small"
-                    onClick={() => addValue(field)}
-                    disabled={values.some((v) => !v.trim())}
-                  >
-                    Thêm dòng
-                  </Button>
-                </Col>
-              </Row>
-              <Divider />
-            </div>
-          ))}
+          {renderFields()}
           <div
             style={{
               display: "flex",
