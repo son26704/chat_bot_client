@@ -96,12 +96,14 @@ const ChatPage = () => {
             const updatedMessages = [...prev.Messages];
 
             // Ghi đè lại tin nhắn cuối (ID tạm) bằng userMessage ID thật
-            if (
-              updatedMessages.length > 0 &&
-              updatedMessages[updatedMessages.length - 1].role === "user"
-            ) {
-              updatedMessages[updatedMessages.length - 1] =
-                response.userMessage;
+            const lastMsgIndex = updatedMessages.findIndex(
+              (msg) => msg.id === response.userMessage.id
+            );
+
+            if (lastMsgIndex !== -1) {
+              updatedMessages[lastMsgIndex] = response.userMessage;
+            } else {
+              updatedMessages.push(response.userMessage);
             }
 
             // Thêm assistantMessage vào
@@ -340,7 +342,7 @@ const ChatPage = () => {
       setEditingMessageId(null);
       setEditValue("");
       if (conversation) await fetchConversation(conversation.id);
-      await fetchConversations(); // Thêm dòng này để cập nhật lại danh sách sidebar
+      await fetchConversations();
       message.success("Message edited and resent");
     } catch (err) {
       message.error("Failed to edit message");
@@ -801,20 +803,14 @@ const ChatPage = () => {
           </div>
 
           {!hasSentFirstMessage && (
-            <div
-              style={{
-                padding: "12px 24px",
-                background: "#fff",
-                borderBottom: "1px solid #f0f0f0",
-              }}
-            >
+            <div className="start-mode-container">
               <Typography.Text
                 strong
                 style={{ display: "block", marginBottom: 8 }}
               >
                 🎯 Chế độ bắt đầu hội thoại:
               </Typography.Text>
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div className="start-mode-row">
                 <Button
                   type={useProfileContext ? "primary" : "default"}
                   onClick={() => setUseProfileContext(true)}

@@ -358,3 +358,35 @@ body {
   background-color: transparent !important;
 }
 
+.start-mode-container {
+  padding: 12px 24px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.start-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .start-mode-container {
+    padding: 10px 8px;
+  }
+  .start-mode-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .start-mode-row .ant-btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .start-mode-row .ant-typography {
+    margin-left: 0 !important;
+    margin-top: 4px;
+    text-align: center;
+    font-size: 13px;
+  }
+}

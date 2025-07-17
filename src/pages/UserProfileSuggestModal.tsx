@@ -153,7 +153,7 @@ const UserProfileSuggestModal = ({
       title={<Title level={4}>🧠 Gợi ý cập nhật hồ sơ</Title>}
       width={800}
       maskClosable={false}
-      destroyOnClose={true}
+      destroyOnHidden={true}
     >
       {renderFields()}
       <div style={{ display: "flex", justifyContent: "end" }}>
