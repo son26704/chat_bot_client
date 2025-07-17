@@ -41,6 +41,7 @@ export interface Message {
   role: 'user' | 'assistant';
   createdAt: string;
   isMemoryWorthy?: boolean; 
+  attachments?: string[];
 }
 
 export interface Conversation {

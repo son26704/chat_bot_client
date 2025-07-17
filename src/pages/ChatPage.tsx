@@ -95,15 +95,11 @@ const ChatPage = () => {
 
             const updatedMessages = [...prev.Messages];
 
-            // Ghi đè lại tin nhắn cuối (ID tạm) bằng userMessage ID thật
             const lastMsgIndex = updatedMessages.findIndex(
               (msg) => msg.id === response.userMessage.id
             );
-
             if (lastMsgIndex !== -1) {
               updatedMessages[lastMsgIndex] = response.userMessage;
-            } else {
-              updatedMessages.push(response.userMessage);
             }
 
             // Thêm assistantMessage vào
