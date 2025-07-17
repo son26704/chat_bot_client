@@ -344,3 +344,17 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+.message-bubble.assistant pre {
+  background-color: #eaf1ea !important; /* nhạt hơn bubble */
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  overflow-x: auto;
+}
+
+.message-bubble.assistant pre code {
+  background-color: transparent !important;
+}
+

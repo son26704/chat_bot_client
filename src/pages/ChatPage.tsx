@@ -42,6 +42,7 @@ import UserProfileModal from "./UserProfileModal";
 import UserProfileSuggestModal from "./UserProfileSuggestModal";
 import type { Message, Conversation, ChatResponse } from "../types/auth";
 import ReactMarkdown from "react-markdown";
+import CodeBlock from "../components/CodeBlock";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -164,6 +165,16 @@ const ChatPage = () => {
     }
   };
 
+  useEffect(() => {
+    if (showSuggestions) {
+      const timeout = setTimeout(() => {
+        setShowSuggestions(false);
+      }, 20000); // 20 giây
+
+      return () => clearTimeout(timeout);
+    }
+  }, [showSuggestions]);
+
   const fetchConversation = async (conversationId: string) => {
     try {
       const conv = await getConversationHistory(conversationId);
@@ -240,6 +251,7 @@ const ChatPage = () => {
 
   const handleSelectConversation = (convId: string) => {
     fetchConversation(convId);
+    setShowSuggestions(false);
     if (window.innerWidth <= 768) {
       setSidebarOpen(false);
     }
@@ -684,7 +696,36 @@ const ChatPage = () => {
                         ) : (
                           <>
                             <div className="markdown-content">
-                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                              <ReactMarkdown
+                                components={{
+                                  code({
+                                    node,
+                                    inline,
+                                    className,
+                                    children,
+                                    ...props
+                                  }: any) {
+                                    const match = /language-(\w+)/.exec(
+                                      className || ""
+                                    );
+                                    return !inline ? (
+                                      <CodeBlock
+                                        language={match?.[1] || ""}
+                                        value={String(children).replace(
+                                          /\n$/,
+                                          ""
+                                        )}
+                                      />
+                                    ) : (
+                                      <code className={className} {...props}>
+                                        {children}
+                                      </code>
+                                    );
+                                  },
+                                }}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
                             </div>
                             <div className="message-actions">
                               <Button
