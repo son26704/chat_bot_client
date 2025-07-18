@@ -87,8 +87,8 @@ const ChatPage = () => {
   );
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
-  const [fileError, setFileError] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // const [fileError, setFileError] = useState<string>("");
+  // const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -473,51 +473,51 @@ const ChatPage = () => {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFileError("");
-    const files = Array.from(e.target.files || []);
-    const maxFiles = 2;
-    const maxSize = 1024 * 1024; // 1MB
-    // Kiểm tra tổng số file
-    if (
-      files.length + attachments.filter((a) => a.type === "file").length >
-      maxFiles
-    ) {
-      setFileError("Chỉ được gửi tối đa 2 file!");
-      return;
-    }
-    // Kiểm tra trùng file (name + size)
-    for (const file of files) {
-      if (file.size > maxSize) {
-        setFileError(`File ${file.name} vượt quá 1MB!`);
-        return;
-      }
-      if (
-        attachments.some(
-          (f) =>
-            f.type === "file" &&
-            f.file.name === file.name &&
-            f.file.size === file.size
-        ) ||
-        files.filter((f) => f.name === file.name && f.size === file.size)
-          .length > 1
-      ) {
-        setFileError(`File ${file.name} đã được chọn!`);
-        return;
-      }
-    }
-    setAttachments((prev) =>
-      [
-        ...prev,
-        ...files.map((f) => ({ type: "file" as const, file: f, name: f.name })),
-      ].slice(0, maxFiles)
-    );
-    e.target.value = ""; // reset input để chọn lại file cũ nếu cần
-  };
+  // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   setFileError("");
+  //   const files = Array.from(e.target.files || []);
+  //   const maxFiles = 2;
+  //   const maxSize = 1024 * 1024; // 1MB
+  //   // Kiểm tra tổng số file
+  //   if (
+  //     files.length + attachments.filter((a) => a.type === "file").length >
+  //     maxFiles
+  //   ) {
+  //     setFileError("Chỉ được gửi tối đa 2 file!");
+  //     return;
+  //   }
+  //   // Kiểm tra trùng file (name + size)
+  //   for (const file of files) {
+  //     if (file.size > maxSize) {
+  //       setFileError(`File ${file.name} vượt quá 1MB!`);
+  //       return;
+  //     }
+  //     if (
+  //       attachments.some(
+  //         (f) =>
+  //           f.type === "file" &&
+  //           f.file.name === file.name &&
+  //           f.file.size === file.size
+  //       ) ||
+  //       files.filter((f) => f.name === file.name && f.size === file.size)
+  //         .length > 1
+  //     ) {
+  //       setFileError(`File ${file.name} đã được chọn!`);
+  //       return;
+  //     }
+  //   }
+  //   setAttachments((prev) =>
+  //     [
+  //       ...prev,
+  //       ...files.map((f) => ({ type: "file" as const, file: f, name: f.name })),
+  //     ].slice(0, maxFiles)
+  //   );
+  //   e.target.value = ""; // reset input để chọn lại file cũ nếu cần
+  // };
 
-  const handleRemoveFile = (idx: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== idx));
-  };
+  // const handleRemoveFile = (idx: number) => {
+  //   setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  // };
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
