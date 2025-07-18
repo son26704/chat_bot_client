@@ -160,7 +160,7 @@ const UserProfileModal = ({
   // Render fields theo thứ tự đã lưu
   const renderFields = () => {
     if (!editing) {
-      return Object.entries(profile).map(([field, value], index) => (
+      return Object.entries(profile).map(([field, value]) => (
         <div key={field} style={{ marginBottom: 16 }}>
           <Row gutter={16}>
             <Col span={6}>
