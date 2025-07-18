@@ -24,6 +24,7 @@ import {
   FileSearchOutlined,
   PaperClipOutlined,
   CloseOutlined,
+  LinkOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -46,6 +47,8 @@ import type { Message, Conversation, ChatResponse } from "../types/auth";
 import ReactMarkdown from "react-markdown";
 import axios from "axios";
 import CodeBlock from "../components/CodeBlock";
+import AttachmentModal from "../components/AttachmentModal";
+import type { AttachmentItem } from "../components/AttachmentModal";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -82,7 +85,8 @@ const ChatPage = () => {
   const [memoryWorthyMsgIds, setMemoryWorthyMsgIds] = useState<Set<string>>(
     new Set()
   );
-  const [attachments, setAttachments] = useState<File[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [fileError, setFileError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -192,127 +196,133 @@ const ChatPage = () => {
   };
 
   const handleSend = async () => {
-  if (!prompt.trim()) {
-    message.error("Please enter a message");
-    return;
-  }
-  if (!hasSentFirstMessage) setHasSentFirstMessage(true);
-  
-  // Tạo userMessage ngay lập tức cho cả hai trường hợp
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    content: prompt, // Chỉ chứa prompt gốc, không format với file đính kèm
-    role: "user",
-    createdAt: new Date().toISOString(),
-    attachments: attachments.length > 0 ? attachments.map(f => f.name) : [],
-  };
-
-  // Thêm userMessage vào state ngay lập tức
-  setConversation((prev) => {
-    if (!prev) {
-      return {
-        id: "temp",
-        title: "",
-        Messages: [userMessage],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+    if (!prompt.trim()) {
+      message.error("Please enter a message");
+      return;
     }
-    return {
-      ...prev,
-      Messages: [...prev.Messages, userMessage],
+    if (!hasSentFirstMessage) setHasSentFirstMessage(true);
+
+    // Chỉ lấy file để gửi lên backend, link sẽ phát triển sau
+    const fileAttachments = attachments.filter((a) => a.type === "file") as {
+      type: "file";
+      file: File;
+      name: string;
+    }[];
+    const linkAttachments = attachments.filter(
+      (a) => a.type === "link"
+    ) as { type: "link"; url: string; name: string }[];
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: prompt,
+      role: "user",
+      createdAt: new Date().toISOString(),
+      attachments: attachments.map((a) => a.name),
     };
-  });
 
-  setPrompt("");
-  setAttachments([]);
-  
-  try {
-    let systemPrompt: string | undefined = undefined;
-    if (useProfileContext) {
-      try {
-        const res = await getUserProfile();
-        const profileJson = JSON.stringify(res, null, 2);
-        systemPrompt = `Thông tin hồ sơ người dùng:\n${profileJson}\n---\nDùng thông tin này để hiểu rõ người dùng hơn`;
-      } catch (err) {
-        console.warn("Không thể lấy hồ sơ người dùng", err);
-      }
-    }
-
-    setIsTyping(true);
-
-    if (attachments.length > 0) {
-      const formData = new FormData();
-      formData.append("prompt", prompt);
-      if (conversation?.id && conversation?.id !== "temp") {
-        formData.append("conversationId", conversation.id);
-      }
-      if (systemPrompt) formData.append("systemPrompt", systemPrompt);
-      attachments.forEach((file) => {
-        formData.append("files", file);
-      });
-      const API_URL = import.meta.env.VITE_API_URL;
-
-      const { data: response } = await axios.post<ChatResponse>(
-        `${API_URL}/chat`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-          },
-        }
-      );
-
-      // Cập nhật conversation với response từ server
-      setConversation((prev) => {
-        if (!prev) {
-          return {
-            id: response.conversationId,
-            title: "",
-            Messages: [response.userMessage, response.assistantMessage],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        
-        const updatedMessages = [...prev.Messages];
-        // Thay thế userMessage tạm thời bằng userMessage từ server
-        if (updatedMessages.length > 0) {
-          updatedMessages[updatedMessages.length - 1] = response.userMessage;
-        }
-        updatedMessages.push(response.assistantMessage);
-        
+    setConversation((prev) => {
+      if (!prev) {
         return {
-          ...prev,
-          id: response.conversationId,
-          Messages: updatedMessages,
+          id: "temp",
+          title: "",
+          Messages: [userMessage],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
-      });
+      }
+      return {
+        ...prev,
+        Messages: [...prev.Messages, userMessage],
+      };
+    });
 
-      if (response.memoryWorthyUserMessageId) {
-        setMemoryWorthyMsgIds((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(response.memoryWorthyUserMessageId!);
-          return newSet;
+    setPrompt("");
+    setAttachments([]);
+
+    try {
+      let systemPrompt: string | undefined = undefined;
+      if (useProfileContext) {
+        try {
+          const res = await getUserProfile();
+          const profileJson = JSON.stringify(res, null, 2);
+          systemPrompt = `Thông tin hồ sơ người dùng:\n${profileJson}\n---\nDùng thông tin này để hiểu rõ người dùng hơn`;
+        } catch (err) {
+          console.warn("Không thể lấy hồ sơ người dùng", err);
+        }
+      }
+
+      setIsTyping(true);
+
+      if (fileAttachments.length > 0 || linkAttachments.length > 0) {
+        const formData = new FormData();
+        formData.append("prompt", prompt);
+        if (conversation?.id && conversation?.id !== "temp") {
+          formData.append("conversationId", conversation.id);
+        }
+        if (systemPrompt) formData.append("systemPrompt", systemPrompt);
+        fileAttachments.forEach((item) => {
+          formData.append("files", item.file);
+        });
+        if (linkAttachments.length > 0) {
+          formData.append("links", JSON.stringify(linkAttachments));
+        }
+
+        const API_URL = import.meta.env.VITE_API_URL;
+
+        const { data: response } = await axios.post<ChatResponse>(
+          `${API_URL}/chat`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+            },
+          }
+        );
+
+        setConversation((prev) => {
+          if (!prev) {
+            return {
+              id: response.conversationId,
+              title: "",
+              Messages: [response.userMessage, response.assistantMessage],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          const updatedMessages = [...prev.Messages];
+          if (updatedMessages.length > 0) {
+            updatedMessages[updatedMessages.length - 1] = response.userMessage;
+          }
+          updatedMessages.push(response.assistantMessage);
+          return {
+            ...prev,
+            id: response.conversationId,
+            Messages: updatedMessages,
+          };
+        });
+
+        if (response.memoryWorthyUserMessageId) {
+          setMemoryWorthyMsgIds((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(response.memoryWorthyUserMessageId!);
+            return newSet;
+          });
+        }
+      } else {
+        await sendChatSocket({
+          prompt,
+          conversationId:
+            conversation?.id === "temp" ? undefined : conversation?.id,
+          ...(systemPrompt ? { systemPrompt } : {}),
         });
       }
-    } else {
-      // Tin nhắn thường sử dụng socket
-      await sendChatSocket({
-        prompt,
-        conversationId:
-          conversation?.id === "temp" ? undefined : conversation?.id,
-        ...(systemPrompt ? { systemPrompt } : {}),
-      });
+
+      setIsTyping(false);
+      await fetchConversations();
+    } catch (error) {
+      message.error("Failed to send message");
+      setIsTyping(false);
     }
-    
-    setIsTyping(false);
-    await fetchConversations();
-  } catch (error) {
-    message.error("Failed to send message");
-    setIsTyping(false);
-  }
-};
+  };
 
   const handleSelectConversation = (convId: string) => {
     fetchConversation(convId);
@@ -469,7 +479,10 @@ const ChatPage = () => {
     const maxFiles = 2;
     const maxSize = 1024 * 1024; // 1MB
     // Kiểm tra tổng số file
-    if (files.length + attachments.length > maxFiles) {
+    if (
+      files.length + attachments.filter((a) => a.type === "file").length >
+      maxFiles
+    ) {
       setFileError("Chỉ được gửi tối đa 2 file!");
       return;
     }
@@ -479,12 +492,26 @@ const ChatPage = () => {
         setFileError(`File ${file.name} vượt quá 1MB!`);
         return;
       }
-      if (attachments.some(f => f.name === file.name && f.size === file.size) || files.filter(f => f.name === file.name && f.size === file.size).length > 1) {
+      if (
+        attachments.some(
+          (f) =>
+            f.type === "file" &&
+            f.file.name === file.name &&
+            f.file.size === file.size
+        ) ||
+        files.filter((f) => f.name === file.name && f.size === file.size)
+          .length > 1
+      ) {
         setFileError(`File ${file.name} đã được chọn!`);
         return;
       }
     }
-    setAttachments((prev) => [...prev, ...files].slice(0, maxFiles));
+    setAttachments((prev) =>
+      [
+        ...prev,
+        ...files.map((f) => ({ type: "file" as const, file: f, name: f.name })),
+      ].slice(0, maxFiles)
+    );
     e.target.value = ""; // reset input để chọn lại file cũ nếu cần
   };
 
@@ -953,46 +980,77 @@ const ChatPage = () => {
             </div>
           )}
 
-          <div className="chat-input-container input-with-icons" style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
-            {/* Hiển thị file đính kèm phía trên TextArea */}
+          <div
+            className="chat-input-container input-with-icons"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "stretch",
+            }}
+          >
+            {/* Hiển thị file đính kèm/link phía trên TextArea */}
             {attachments.length > 0 && (
-              <div style={{
-                marginBottom: 10,
-                display: "flex",
-                gap: 8,
-                flexWrap: "wrap",
-                width: "100%",
-                alignItems: "center",
-              }}>
-                {attachments.map((file, idx) => (
-                  <div key={idx} style={{
-                    background: "#f5f5f5",
-                    border: "1px solid #e0e0e0",
-                    borderRadius: 6,
-                    padding: "4px 12px 4px 8px",
-                    display: "flex",
-                    alignItems: "center",
-                    fontSize: 13,
-                    gap: 4,
-                    color: "#595959",
-                    maxWidth: 180,
-                  }}>
-                    <PaperClipOutlined style={{ marginRight: 4, color: "#bfbfbf" }} />
-                    <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</span>
+              <div
+                style={{
+                  marginBottom: 10,
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  width: "100%",
+                  alignItems: "center",
+                }}
+              >
+                {attachments.map((item, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: "#f5f5f5",
+                      border: "1px solid #e0e0e0",
+                      borderRadius: 6,
+                      padding: "4px 12px 4px 8px",
+                      display: "flex",
+                      alignItems: "center",
+                      fontSize: 13,
+                      gap: 4,
+                      color: "#595959",
+                      maxWidth: 220,
+                    }}
+                  >
+                    {item.type === "file" ? (
+                      <PaperClipOutlined
+                        style={{ marginRight: 4, color: "#bfbfbf" }}
+                      />
+                    ) : (
+                      <LinkOutlined
+                        style={{ marginRight: 4, color: "#1890ff" }}
+                      />
+                    )}
+                    <span
+                      style={{
+                        maxWidth: 120,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.name}
+                    </span>
                     <Button
                       type="text"
                       size="small"
                       icon={<CloseOutlined />}
-                      onClick={() => handleRemoveFile(idx)}
+                      onClick={() =>
+                        setAttachments((prev) =>
+                          prev.filter((_, i) => i !== idx)
+                        )
+                      }
                       style={{ marginLeft: 4 }}
                     />
                   </div>
                 ))}
               </div>
             )}
-            {fileError && (
-              <div style={{ color: "#ff4d4f", marginBottom: 8, fontSize: 13 }}>{fileError}</div>
-            )}
+            {/* Nút mở modal đính kèm */}
             <div style={{ position: "relative", width: "100%" }}>
               <TextArea
                 rows={4}
@@ -1002,25 +1060,19 @@ const ChatPage = () => {
                 placeholder="Nhập câu hỏi... (Enter để gửi, Shift + Enter để xuống dòng)"
                 style={{ width: "100%", minWidth: 0, paddingRight: 120 }}
               />
-              <div className="chat-action-buttons" style={{
-                position: "absolute",
-                right: 16,
-                bottom: 16,
-                display: "flex",
-                flexDirection: "row",
-                gap: 8,
-                alignItems: "center",
-                zIndex: 2,
-              }}>
-                {/* Nút upload file custom */}
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.txt"
-                  style={{ display: "none" }}
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                />
+              <div
+                className="chat-action-buttons"
+                style={{
+                  position: "absolute",
+                  right: 16,
+                  bottom: 16,
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: 8,
+                  alignItems: "center",
+                  zIndex: 2,
+                }}
+              >
                 <Button
                   icon={<PaperClipOutlined />}
                   shape="circle"
@@ -1029,9 +1081,11 @@ const ChatPage = () => {
                     border: "1px solid #b7eb8f",
                     color: "#52c41a",
                   }}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={attachments.length >= 2}
-                  title="Đính kèm file (tối đa 2 file, mỗi file <= 1MB)"
+                  onClick={() => setShowAttachmentModal(true)}
+                  disabled={
+                    attachments.filter((a) => a.type === "file").length >= 2
+                  }
+                  title="Đính kèm file hoặc link (tối đa 2 file, mỗi file <= 1MB)"
                 />
                 <Button
                   icon={<SendOutlined />}
@@ -1052,6 +1106,14 @@ const ChatPage = () => {
               </div>
             </div>
           </div>
+          <AttachmentModal
+            visible={showAttachmentModal}
+            onClose={() => setShowAttachmentModal(false)}
+            onOk={() => setShowAttachmentModal(false)}
+            attachments={attachments}
+            setAttachments={setAttachments}
+            maxFiles={2}
+          />
         </div>
         {showSuggestions && (
           <div className="suggestions-box">
