@@ -22,6 +22,8 @@ import {
   CopyOutlined,
   BulbOutlined,
   FileSearchOutlined,
+  PaperClipOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -81,6 +83,8 @@ const ChatPage = () => {
     new Set()
   );
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [fileError, setFileError] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -457,6 +461,35 @@ const ChatPage = () => {
       console.error("❌ Error in handleSuggestFromConversation:", error);
       message.error("Không thể gợi ý từ cuộc trò chuyện");
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError("");
+    const files = Array.from(e.target.files || []);
+    const maxFiles = 2;
+    const maxSize = 1024 * 1024; // 1MB
+    // Kiểm tra tổng số file
+    if (files.length + attachments.length > maxFiles) {
+      setFileError("Chỉ được gửi tối đa 2 file!");
+      return;
+    }
+    // Kiểm tra trùng file (name + size)
+    for (const file of files) {
+      if (file.size > maxSize) {
+        setFileError(`File ${file.name} vượt quá 1MB!`);
+        return;
+      }
+      if (attachments.some(f => f.name === file.name && f.size === file.size) || files.filter(f => f.name === file.name && f.size === file.size).length > 1) {
+        setFileError(`File ${file.name} đã được chọn!`);
+        return;
+      }
+    }
+    setAttachments((prev) => [...prev, ...files].slice(0, maxFiles));
+    e.target.value = ""; // reset input để chọn lại file cũ nếu cần
+  };
+
+  const handleRemoveFile = (idx: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
   return (
@@ -920,52 +953,103 @@ const ChatPage = () => {
             </div>
           )}
 
-          <div className="chat-input-container input-with-icons">
-            <TextArea
-              rows={4} // tăng chiều cao
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={handleKeyPress}
-              placeholder="Nhập câu hỏi... (Enter để gửi, Shift + Enter để xuống dòng)"
-            />
-            <div style={{ margin: "8px 0" }}>
-              <input
-                type="file"
-                multiple
-                accept=".pdf,.doc,.docx,.txt"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  setAttachments(files.slice(0, 2)); // Giới hạn tối đa 2 file
-                }}
+          <div className="chat-input-container input-with-icons" style={{ display: "flex", flexDirection: "column", alignItems: "stretch" }}>
+            {/* Hiển thị file đính kèm phía trên TextArea */}
+            {attachments.length > 0 && (
+              <div style={{
+                marginBottom: 10,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                width: "100%",
+                alignItems: "center",
+              }}>
+                {attachments.map((file, idx) => (
+                  <div key={idx} style={{
+                    background: "#f5f5f5",
+                    border: "1px solid #e0e0e0",
+                    borderRadius: 6,
+                    padding: "4px 12px 4px 8px",
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: 13,
+                    gap: 4,
+                    color: "#595959",
+                    maxWidth: 180,
+                  }}>
+                    <PaperClipOutlined style={{ marginRight: 4, color: "#bfbfbf" }} />
+                    <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</span>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CloseOutlined />}
+                      onClick={() => handleRemoveFile(idx)}
+                      style={{ marginLeft: 4 }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            {fileError && (
+              <div style={{ color: "#ff4d4f", marginBottom: 8, fontSize: 13 }}>{fileError}</div>
+            )}
+            <div style={{ position: "relative", width: "100%" }}>
+              <TextArea
+                rows={4}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Nhập câu hỏi... (Enter để gửi, Shift + Enter để xuống dòng)"
+                style={{ width: "100%", minWidth: 0, paddingRight: 120 }}
               />
-              {attachments.length > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <strong>📎 File sẽ gửi:</strong>
-                  <ul style={{ paddingLeft: 20 }}>
-                    {attachments.map((file, idx) => (
-                      <li key={idx}>{file.name}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-            <div className="chat-action-buttons">
-              <Button
-                icon={<SendOutlined />}
-                type="primary"
-                shape="circle"
-                onClick={handleSend}
-              />
-              <Button
-                icon={<BulbOutlined />}
-                shape="circle"
-                style={{
-                  backgroundColor: "#fff7e6",
-                  border: "1px solid #faad14",
-                  color: "#fa8c16",
-                }}
-                onClick={handleGetSuggestions}
-              />
+              <div className="chat-action-buttons" style={{
+                position: "absolute",
+                right: 16,
+                bottom: 16,
+                display: "flex",
+                flexDirection: "row",
+                gap: 8,
+                alignItems: "center",
+                zIndex: 2,
+              }}>
+                {/* Nút upload file custom */}
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.txt"
+                  style={{ display: "none" }}
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                />
+                <Button
+                  icon={<PaperClipOutlined />}
+                  shape="circle"
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #b7eb8f",
+                    color: "#52c41a",
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={attachments.length >= 2}
+                  title="Đính kèm file (tối đa 2 file, mỗi file <= 1MB)"
+                />
+                <Button
+                  icon={<SendOutlined />}
+                  type="primary"
+                  shape="circle"
+                  onClick={handleSend}
+                />
+                <Button
+                  icon={<BulbOutlined />}
+                  shape="circle"
+                  style={{
+                    backgroundColor: "#fff7e6",
+                    border: "1px solid #faad14",
+                    color: "#fa8c16",
+                  }}
+                  onClick={handleGetSuggestions}
+                />
+              </div>
             </div>
           </div>
         </div>
