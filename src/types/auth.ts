@@ -56,3 +56,12 @@ export interface Conversation {
 export interface FollowUpQuestionsResponse {
   suggestions: string;
 }
+
+export interface SearchWebResult {
+  title: string;
+  url: string;
+}
+
+export interface SearchWebResponse {
+  results: SearchWebResult[];
+}

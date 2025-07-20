@@ -121,7 +121,7 @@ const AttachmentModal: React.FC<AttachmentModalProps> = ({
       onCancel={onClose}
       onOk={onOk}
       okText="Xong"
-      destroyOnClose
+      destroyOnHidden
     >
       <Typography.Text strong>
         1. Kéo thả file hoặc chọn file (tối đa {maxFiles}, mỗi file ≤ 1MB):
@@ -184,7 +184,24 @@ const AttachmentModal: React.FC<AttachmentModalProps> = ({
               </span>
             ) : (
               <span>
-                <LinkOutlined style={{ color: "#1890ff" }} /> {item.name}
+                <LinkOutlined style={{ color: "#1890ff" }} />
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    maxWidth: 180,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    display: "inline-block",
+                    verticalAlign: "middle",
+                    marginLeft: 4
+                  }}
+                  title={item.url}
+                >
+                  {item.url}
+                </a>
               </span>
             )}
           </List.Item>

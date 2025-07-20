@@ -49,6 +49,8 @@ import axios from "axios";
 import CodeBlock from "../components/CodeBlock";
 import AttachmentModal from "../components/AttachmentModal";
 import type { AttachmentItem } from "../components/AttachmentModal";
+import SearchWebModal from "../components/SearchWebModal";
+import { SearchOutlined } from "@ant-design/icons";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -87,6 +89,7 @@ const ChatPage = () => {
   );
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [showSearchWebModal, setShowSearchWebModal] = useState(false);
   // const [fileError, setFileError] = useState<string>("");
   // const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -872,6 +875,9 @@ const ChatPage = () => {
                                       </code>
                                     );
                                   },
+                                  a: ({ node, ...props }) => (
+                                    <a {...props} target="_blank" rel="noopener noreferrer" />
+                                  ),
                                 }}
                               >
                                 {msg.content}
@@ -1025,16 +1031,35 @@ const ChatPage = () => {
                         style={{ marginRight: 4, color: "#1890ff" }}
                       />
                     )}
-                    <span
-                      style={{
-                        maxWidth: 120,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {item.name}
-                    </span>
+                    {item.type === "link" ? (
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          maxWidth: 120,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          display: "inline-block",
+                          verticalAlign: "middle"
+                        }}
+                        title={item.url}
+                      >
+                        {item.url}
+                      </a>
+                    ) : (
+                      <span
+                        style={{
+                          maxWidth: 120,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {item.name}
+                      </span>
+                    )}
                     <Button
                       type="text"
                       size="small"
@@ -1086,6 +1111,17 @@ const ChatPage = () => {
                     attachments.filter((a) => a.type === "file").length >= 2
                   }
                   title="Đính kèm file hoặc link (tối đa 2 file, mỗi file <= 1MB)"
+                />
+                <Button
+                  icon={<SearchOutlined />}
+                  shape="circle"
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #91d5ff",
+                    color: "#1677ff",
+                  }}
+                  onClick={() => setShowSearchWebModal(true)}
+                  title="Tìm kiếm và đính kèm link từ web"
                 />
                 <Button
                   icon={<SendOutlined />}
@@ -1172,6 +1208,14 @@ const ChatPage = () => {
             setSuggestedProfileData(null);
           }}
           data={suggestedProfileData}
+        />
+        <SearchWebModal
+          visible={showSearchWebModal}
+          onClose={() => setShowSearchWebModal(false)}
+          onAttachLinks={(links) => {
+            setAttachments(links);
+            setShowSearchWebModal(false);
+          }}
         />
       </Content>
     </Layout>
